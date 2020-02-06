@@ -34,7 +34,7 @@ WINDOW_SIZE = 10
 MSP_CHANNEL = 4
 CONDUCTIVE_THRESHOLD = 100000
 NON_CONDUCTIVE_PEAK = 100000
-CONDUCTIVE_PEAK = 4000000
+CONDUCTIVE_PEAK = 3000000
 CAP_DECREASE_PEAK = 100000
 NON_NOISE_THRESHOLD = 10000
 SINGLE_CAP_THRESHOLD = 50000
@@ -178,13 +178,13 @@ class FetchData:
         return np.median(data)
 
     def adjustPeak(self):
+        self.isTouch = False
         for k in range(self.layer):                
             for i in range(self.totalChannel):
                 diff = self.diffs[k][i]
                 if diff < 0 and not self.recalibration:
                     if abs(diff) < CONDUCTIVE_THRESHOLD and abs(diff) > self.nonConductivePeak[k][i] :
                         self.nonConductivePeak[k][i] =  abs(diff)
-                        pass
                     elif abs(diff) >= CONDUCTIVE_THRESHOLD:
                         if abs(diff) > self.conductivePeak[k][i]:
                             self.conductivePeak[k][i]=  abs(diff)
