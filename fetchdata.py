@@ -32,14 +32,14 @@ INTERNAL_MUX_MODE = 0
 EXTERNAL_MUX_MODE = 1
 WINDOW_SIZE = 10
 MSP_CHANNEL = 4
-CONDUCTIVE_THRESHOLD = 20000
-NON_CONDUCTIVE_PEAK = 20000
-CONDUCTIVE_PEAK = 150000
+CONDUCTIVE_THRESHOLD = 30000
+NON_CONDUCTIVE_PEAK = 30000
+CONDUCTIVE_PEAK = 150000    # TO ++ 
 CAP_DECREASE_PEAK = 100000
 NON_NOISE_THRESHOLD = 10000
 SINGLE_CAP_THRESHOLD = 50000
 # Specific Port related to your device
-ARDUINO_SERIAL_PORT = "COM4"
+ARDUINO_SERIAL_PORT = "/dev/ttyACM0"
 CHANELL = 4
 
 def serialRead():
@@ -87,7 +87,7 @@ class FetchData:
         self.reset()
         print(self.arduino_port.readline()) # b'FDC SETTING\r\n'
         print(self.arduino_port.readline()) # b'Sensor Start\r\n'
-        print ('build successful')
+        print('build successful')
 
 
     def socket_handler(self):
@@ -121,8 +121,8 @@ class FetchData:
                         else:
                             ch.append(-diff/self.conductivePeak[k][i])
                     else:
-                        ch.append(-diff/CAP_DECREASE_PEAK)
-                        # ch.append(0)
+                        #ch.append(-diff/CAP_DECREASE_PEAK)
+                        ch.append(0)
 
                 # print (data[i]-base[i])
                 # rawch.append(data[i])
@@ -145,7 +145,7 @@ class FetchData:
             # print("Low Peak: " + ' '.join(str(e) for e in self.nonConductivePeak) + '\n')
             # print("Upper Peak: " + ' '.join(str(e) for e in self.capDecreasePeak) + '\n')
             # print("Pre Deformed Data: " + ' '.join(str(e) for e in self.pre_deformed_data) + '\n')
-            print("Value: " + ' '.join(str(e) for e in ch) + '\n')
+            print("Value: " + ' '.join(str(e) for e in ch) + '\n') # TODO cancel #
             # print("isConductive: " + ' '.join(str(e) for e in isConductive) +'\n')
             # self.conn.send(' '.join(str(e) for e in rawch) + '\n')
             # time.sleep(self.send_time)
@@ -168,23 +168,25 @@ class FetchData:
         for i in range(self.r):
             for j in range(self.c):
                 for k in range(self.layer):
+                    # fill in self.data from zero to arduino_port
                     self.data[k][i*self.c + j][:-1] = self.data[k][i*self.c + j][1:]
                     self.data[k][i*self.c + j][-1] = int(result_arr[i*self.c * self.layer + j*self.layer+k])
                     if self.calibration:
                         self.base[k][i*self.c + j] = copy.deepcopy(self.data[k][i*self.c + j])
 
         # print ("record took " +str(time.time()-start_time)+ "s")
+        self.recgMaterial()    #TODO cancel #
         self.calDiff()
         # self.adjustPeak()
         # self.scaleDiff()
-        self.cancelSingleCap()
+        #self.cancelSingleCap()
         if self.calibration:
             self.calibration = False   
         if self.recalibration:
             self.calibration = True  
             self.recalibration = False
         # time.sleep(0.01)
-        print ("record took " +str(time.time()-start_time)+ "s")
+        print("record took " +str(time.time()-start_time)+ "s")
 
     def processData(self, data):
         return np.median(data)
@@ -202,6 +204,20 @@ class FetchData:
                             self.conductivePeak[k][i]= abs(diff)
                 elif diff > 0 and abs(diff) > self.capDecreasePeak[k][i] and not self.recalibration:
                     self.capDecreasePeak[k][i] = abs(diff)
+    def recgMaterial(self):
+        max_metrix=max(max(self.diffs))
+        print("Max of the metrix is ", max_metrix)
+
+        useful_points = []
+        cover_rate=0.9
+        for k in range(self.layer):
+            for i in range(self):
+                t = abs(self.diffs[k][index])
+                if(t > max_metrix * cover_rate):
+                    useful_points.append(t)
+        avr = np.mean(useful_points)    # avr
+        print("Average of this type is ", avr)
+
     '''
     Adjust diffs[][]
     '''
@@ -220,24 +236,26 @@ class FetchData:
     '''
     Subtract abs(minimum) in column and raw for diffs[]
     '''
+
     def cancelSingleCap(self):
-        
+
         candidates = []
         for k in range(self.layer):
             for i in range(self.r):
-                row_caps = [abs(self.diffs[k][i*self.c+j]) for j in range(self.c)]
+                row_caps = [abs(self.diffs[k][i * self.c + j]) for j in range(self.c)]
                 minimum = min(row_caps)
 
                 for j in range(self.c):
-                    index = i*self.c + j
+                    index = i * self.c + j
                     self.diffs[k][index] = -(abs(self.diffs[k][index]) - minimum)
             for j in range(self.c):
-                col_caps = [abs(self.diffs[k][i*self.c+j]) if abs(self.diffs[k][i*self.c+j]) > NON_NOISE_THRESHOLD else 10000000 for i in range(self.r)]
+                col_caps = [abs(self.diffs[k][i * self.c + j]) if abs(
+                    self.diffs[k][i * self.c + j]) > NON_NOISE_THRESHOLD else 10000000 for i in range(self.r)]
                 minimum = min(col_caps)
                 if minimum == 10000000:
                     continue
                 for i in range(self.r):
-                    index = i*self.c + j
+                    index = i * self.c + j
                     self.diffs[k][index] = -(abs(self.diffs[k][index]) - minimum)
         # single_caps = []
         #
