@@ -1,9 +1,9 @@
 
 import processing.serial.*;
 import processing.net.*;
-import signal.library.*;
+//import signal.library.*;
 import blobDetection.*;
-SignalFilter myFilter;
+//SignalFilter myFilter;
 Client myClient; 
 int dataIn; 
 

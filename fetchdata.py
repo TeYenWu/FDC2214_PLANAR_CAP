@@ -32,13 +32,13 @@ INTERNAL_MUX_MODE = 0
 EXTERNAL_MUX_MODE = 1
 WINDOW_SIZE = 10
 MSP_CHANNEL = 4
-CONDUCTIVE_THRESHOLD = 100000
-NON_CONDUCTIVE_PEAK = 100000
-CONDUCTIVE_PEAK = 3000000
+CONDUCTIVE_THRESHOLD = 20000
+NON_CONDUCTIVE_PEAK = 20000
+CONDUCTIVE_PEAK = 150000
 CAP_DECREASE_PEAK = 100000
 NON_NOISE_THRESHOLD = 10000
 SINGLE_CAP_THRESHOLD = 50000
-ARDUINO_SERIAL_PORT = "/dev/cu.usbmodem14631"
+ARDUINO_SERIAL_PORT = "COM4"
 CHANELL = 4
 
 def serialRead():
@@ -110,12 +110,12 @@ class FetchData:
                     # print(i)
                     if diff < 0:
                         if abs(diff) < CONDUCTIVE_THRESHOLD:
-                            ch.append(-diff/self.nonConductivePeak[k][i])
+                            ch.append(diff/self.nonConductivePeak[k][i])
                         else:
-                            ch.append(diff/self.conductivePeak[k][i])
+                            ch.append(-diff/self.conductivePeak[k][i])
                     else:
-                        # ch.append(diff/self.capDecreasePeak[k][i])
-                        ch.append(0)
+                        ch.append(-diff/CAP_DECREASE_PEAK)
+                        # ch.append(0)
 
                 # print (data[i]-base[i])
                 # rawch.append(data[i])
@@ -160,12 +160,13 @@ class FetchData:
                     self.data[k][i*self.c + j][:-1] = self.data[k][i*self.c + j][1:]
                     self.data[k][i*self.c + j][-1] = int(result_arr[i*self.c * self.layer + j*self.layer+k])
                     if self.calibration:
-                        self.base[k][i*self.c + j]= copy.deepcopy(self.data[k][i*self.c + j])
+                        self.base[k][i*self.c + j] = copy.deepcopy(self.data[k][i*self.c + j])
 
         # print ("record took " +str(time.time()-start_time)+ "s")
         self.calDiff()
         # self.adjustPeak()
-        # self.cancelSingleCap()
+        # self.scaleDiff()
+        self.cancelSingleCap()
         if self.calibration:
             self.calibration = False   
         if self.recalibration:
@@ -184,10 +185,10 @@ class FetchData:
                 diff = self.diffs[k][i]
                 if diff < 0 and not self.recalibration:
                     if abs(diff) < CONDUCTIVE_THRESHOLD and abs(diff) > self.nonConductivePeak[k][i] :
-                        self.nonConductivePeak[k][i] =  abs(diff)
+                        self.nonConductivePeak[k][i] = abs(diff)
                     elif abs(diff) >= CONDUCTIVE_THRESHOLD:
                         if abs(diff) > self.conductivePeak[k][i]:
-                            self.conductivePeak[k][i]=  abs(diff)
+                            self.conductivePeak[k][i]= abs(diff)
                 elif diff > 0 and abs(diff) > self.capDecreasePeak[k][i] and not self.recalibration:
                     self.capDecreasePeak[k][i] = abs(diff)
 
@@ -199,58 +200,75 @@ class FetchData:
                 diff = processed_data-processed_base
                 self.diffs[k][i] = diff
 
+    def scaleDiff(self):
+        for k in range(self.layer):
+            for i in range(self.totalChannel):
+                self.diffs[k][i] = self.diffs[k][i]/self.conductivePeak[k][i]
+
     def cancelSingleCap(self):
         
         candidates = []
-        for k in range(self.layer):                
+        for k in range(self.layer):
             for i in range(self.r):
+                row_caps = [abs(self.diffs[k][i*self.c+j])  for j in range(self.c)]
+                minimum = min(row_caps)
+
                 for j in range(self.c):
                     index = i*self.c + j
-                    diff = self.diffs[k][index]
-                    if abs(diff) > NON_NOISE_THRESHOLD and diff < 0:
-                        candidates.append((k, i, j))
-        single_caps = []
-        for candidate in candidates:
-            k = candidate[0]
-            i = candidate[1]
-            j = candidate[2]
-            index = i*self.c + j
-            isDiffCap = True
-            minimum = 10000000
-            for y in range(0, self.r):
-                index2 = y*self.c + j
-                if self.diffs[k][index2] > 0:
+                    self.diffs[k][index] = -(abs(self.diffs[k][index]) - minimum)
+            for j in range(self.c):
+                col_caps = [abs(self.diffs[k][i*self.c+j]) if abs(self.diffs[k][i*self.c+j]) > NON_NOISE_THRESHOLD else 10000000 for i in range(self.r)]
+                minimum = min(col_caps)
+                if minimum == 10000000:
                     continue
-                if abs(self.diffs[k][index2]) < minimum:
-                    minimum = abs(self.diffs[k][index2])
-
-            if abs(self.diffs[k][index]) - minimum < SINGLE_CAP_THRESHOLD or minimum < NON_NOISE_THRESHOLD:
-                if minimum < NON_NOISE_THRESHOLD:
-                    minimum = abs(self.diffs[k][index])
-                isDiffCap = False
-
-            # minimum = 10000000
-            for x in range(0, self.c):
-                index2 = i*self.c + x
-                if self.diffs[k][index2] > 0:
-                    continue
-                if abs(self.diffs[k][index2]) < minimum:
-                     minimum = abs(self.diffs[k][index2])
-            if abs(self.diffs[k][index]) - minimum < SINGLE_CAP_THRESHOLD or minimum < NON_NOISE_THRESHOLD:
-                if minimum < NON_NOISE_THRESHOLD:
-                    minimum = abs(self.diffs[k][index])
-                isDiffCap = False
-
-            if not isDiffCap:
-                single_caps.append((k, i, j, minimum))
-
-        for candidate in single_caps:
-            k = candidate[0]
-            i = candidate[1]
-            j = candidate[2]
-            minimum = candidate[3]
-            index = i*self.c + j
-            self.diffs[k][index] += minimum
+                for i in range(self.r):
+                    index = i*self.c + j
+                    self.diffs[k][index] = -(abs(self.diffs[k][index]) - minimum)
+        # single_caps = []
+        #
+        # for i in range(self.r):
+        #
+        # for candidate in candidates:
+        #     k = candidate[0]
+        #     i = candidate[1]
+        #     j = candidate[2]
+        #     index = i*self.c + j
+        #     isDiffCap = True
+        #     minimumY = 10000000
+        #     for y in range(0, self.r):
+        #         index2 = y*self.c + j
+        #         if self.diffs[k][index2] > 0:
+        #             continue
+        #         if abs(self.diffs[k][index2]) < minimumY:
+        #             minimumY = abs(self.diffs[k][index2])
+        #
+        #     if abs(self.diffs[k][index]) - minimumY < SINGLE_CAP_THRESHOLD or minimumY < NON_NOISE_THRESHOLD:
+        #         if minimumY < NON_NOISE_THRESHOLD:
+        #             minimumY = abs(self.diffs[k][index])
+        #         isDiffCap = False
+        #
+        #     # minimum = 10000000
+        #     for x in range(0, self.c):
+        #         index2 = i*self.c + x
+        #         if self.diffs[k][index2] > 0:
+        #             continue
+        #         if abs(self.diffs[k][index2]) < minimum:
+        #              minimum = abs(self.diffs[k][index2])
+        #     if abs(self.diffs[k][index]) - minimum < SINGLE_CAP_THRESHOLD or minimum < NON_NOISE_THRESHOLD:
+        #         if minimum < NON_NOISE_THRESHOLD:
+        #             minimum = abs(self.diffs[k][index])
+        #         isDiffCap = False
+        #
+        #     if not isDiffCap:
+        #         single_caps.append((k, i, j, minimum))
+        #
+        # for candidate in single_caps:
+        #     k = candidate[0]
+        #     i = candidate[1]
+        #     j = candidate[2]
+        #     minimum = candidate[3]
+        #     index = i*self.c + j
+        #     self.diffs[k][index] += minimum
 
     def reset(self):
         self.recalibration = True
@@ -297,7 +315,7 @@ class FetchData:
 
 
 if __name__ == '__main__':
-
+    (serialRead())
     # MSPComm("/dev/cu.usbmodem14141", "Test")
     fetchdata = FetchData()
     fetchdata.start()
