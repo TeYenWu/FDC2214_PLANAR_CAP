@@ -38,6 +38,7 @@ CONDUCTIVE_PEAK = 150000
 CAP_DECREASE_PEAK = 100000
 NON_NOISE_THRESHOLD = 10000
 SINGLE_CAP_THRESHOLD = 50000
+# Specific Port related to your device
 ARDUINO_SERIAL_PORT = "COM4"
 CHANELL = 4
 
@@ -57,6 +58,9 @@ def serialRead():
 
 
 class FetchData:
+    '''
+    Function: Build by set FDC and start sensor
+    '''
     def __init__(self):
         # second
 
@@ -81,8 +85,8 @@ class FetchData:
         self.arduino_port.dsrdtr = 0
         # time.sleep(1)
         self.reset()
-        print(self.arduino_port.readline())
-        print(self.arduino_port.readline())
+        print(self.arduino_port.readline()) # b'FDC SETTING\r\n'
+        print(self.arduino_port.readline()) # b'Sensor Start\r\n'
         print ('build successful')
 
 
@@ -98,7 +102,10 @@ class FetchData:
                 self.conn, addr = self.mysocket.accept()
                 if self.conn:
                     print('Connected by', addr)
-
+    '''
+    Process values and then send them all out by send()
+    Read diffs[][], calculate and get ch[].
+    '''
     def sender(self):
         while 1:
             self.fetch_ch_data()
@@ -143,7 +150,11 @@ class FetchData:
             # self.conn.send(' '.join(str(e) for e in rawch) + '\n')
             # time.sleep(self.send_time)
 
-
+    '''
+    Read signal from arduino_port 
+    Calibrate them by substracting base
+    So we get diffs[][]
+    '''
     def fetch_ch_data(self):
         
         # self.base = np.zeros((self.totalChannel, WINDOW_SIZE))
@@ -191,7 +202,9 @@ class FetchData:
                             self.conductivePeak[k][i]= abs(diff)
                 elif diff > 0 and abs(diff) > self.capDecreasePeak[k][i] and not self.recalibration:
                     self.capDecreasePeak[k][i] = abs(diff)
-
+    '''
+    Adjust diffs[][]
+    '''
     def calDiff(self):
         for k in range(self.layer):                
             for i in range(self.totalChannel):
@@ -204,13 +217,15 @@ class FetchData:
         for k in range(self.layer):
             for i in range(self.totalChannel):
                 self.diffs[k][i] = self.diffs[k][i]/self.conductivePeak[k][i]
-
+    '''
+    Subtract abs(minimum) in column and raw for diffs[]
+    '''
     def cancelSingleCap(self):
         
         candidates = []
         for k in range(self.layer):
             for i in range(self.r):
-                row_caps = [abs(self.diffs[k][i*self.c+j])  for j in range(self.c)]
+                row_caps = [abs(self.diffs[k][i*self.c+j]) for j in range(self.c)]
                 minimum = min(row_caps)
 
                 for j in range(self.c):
