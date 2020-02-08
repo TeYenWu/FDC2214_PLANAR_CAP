@@ -1,6 +1,6 @@
 # _*_ coding: utf-8 _*_
 
-#3/30
+# 3/30
 
 # from MSP430 import MSPComm
 # from MSP430 import WINDOW_SIZE
@@ -11,9 +11,10 @@ import serial.tools.list_ports
 import serial
 import numpy as np
 import matplotlib
+
 # import matplotlib.pyplot as plt
 # import matplotlib.font_manager as fm
-matplotlib.use('TkAgg') 
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import matplotlib.rcsetup as rcsetup
 import math
@@ -25,6 +26,7 @@ from sklearn.neighbors import NearestNeighbors
 # import feature_extraction8
 from sklearn import preprocessing
 from sklearn.externals import joblib
+
 # import matplotlib
 
 print(rcsetup.all_backends)
@@ -32,15 +34,16 @@ INTERNAL_MUX_MODE = 0
 EXTERNAL_MUX_MODE = 1
 WINDOW_SIZE = 10
 MSP_CHANNEL = 4
-CONDUCTIVE_THRESHOLD = 30000
-NON_CONDUCTIVE_PEAK = 30000
-CONDUCTIVE_PEAK = 150000    # TO ++ 
+CONDUCTIVE_THRESHOLD = 600000
+NON_CONDUCTIVE_PEAK = 600000
+CONDUCTIVE_PEAK = 5000000  # TO ++
 CAP_DECREASE_PEAK = 100000
-NON_NOISE_THRESHOLD = 10000
+NON_NOISE_THRESHOLD = 5000
 SINGLE_CAP_THRESHOLD = 50000
 # Specific Port related to your device
-ARDUINO_SERIAL_PORT = "/dev/ttyACM0"
+ARDUINO_SERIAL_PORT = "COM4"
 CHANELL = 4
+
 
 def serialRead():
     # detect serial port.
@@ -61,6 +64,7 @@ class FetchData:
     '''
     Function: Build by set FDC and start sensor
     '''
+
     def __init__(self):
         # second
 
@@ -74,7 +78,7 @@ class FetchData:
         self.recalibration = False
         self.calibration = True
 
-        self.totalChannel =  self.r * self.c
+        self.totalChannel = self.r * self.c
 
         self.data = np.zeros((self.layer, self.totalChannel, WINDOW_SIZE))
         self.base = np.zeros((self.layer, self.totalChannel, WINDOW_SIZE))
@@ -85,44 +89,41 @@ class FetchData:
         self.arduino_port.dsrdtr = 0
         # time.sleep(1)
         self.reset()
-        print(self.arduino_port.readline()) # b'FDC SETTING\r\n'
-        print(self.arduino_port.readline()) # b'Sensor Start\r\n'
+        print(self.arduino_port.readline())  # b'FDC SETTING\r\n'
+        print(self.arduino_port.readline())  # b'Sensor Start\r\n'
         print('build successful')
-
 
     def socket_handler(self):
         while True:
             if self.conn:
                 data = self.conn.recv(1024)
                 if data:
-                    d = data.decode("utf-8") 
+                    d = data.decode("utf-8")
                     if d.strip() == "reset":
                         self.reset()
             else:
                 self.conn, addr = self.mysocket.accept()
                 if self.conn:
                     print('Connected by', addr)
+
     '''
     Process values and then send them all out by send()
     Read diffs[][], calculate and get ch[].
     '''
+
     def sender(self):
         while 1:
             self.fetch_ch_data()
             ch = []
             rawch = []
-            for k in range(self.layer):       
+            for k in range(self.layer):
                 for i in range(self.r * self.c):
                     diff = self.diffs[k][i]
                     # print(i)
-                    if diff < 0:
-                        if abs(diff) < CONDUCTIVE_THRESHOLD:
-                            ch.append(diff/self.nonConductivePeak[k][i])
-                        else:
-                            ch.append(-diff/self.conductivePeak[k][i])
+                    if diff < CONDUCTIVE_THRESHOLD:
+                        ch.append(diff/self.nonConductivePeak[k][i])
                     else:
-                        #ch.append(-diff/CAP_DECREASE_PEAK)
-                        ch.append(0)
+                        ch.append((-diff/self.conductivePeak[k][i]))
 
                 # print (data[i]-base[i])
                 # rawch.append(data[i])
@@ -145,7 +146,7 @@ class FetchData:
             # print("Low Peak: " + ' '.join(str(e) for e in self.nonConductivePeak) + '\n')
             # print("Upper Peak: " + ' '.join(str(e) for e in self.capDecreasePeak) + '\n')
             # print("Pre Deformed Data: " + ' '.join(str(e) for e in self.pre_deformed_data) + '\n')
-            print("Value: " + ' '.join(str(e) for e in ch) + '\n') # TODO cancel #
+            print("Value: " + ' '.join(str(e) for e in ch) + '\n')  # TODO cancel #
             # print("isConductive: " + ' '.join(str(e) for e in isConductive) +'\n')
             # self.conn.send(' '.join(str(e) for e in rawch) + '\n')
             # time.sleep(self.send_time)
@@ -155,87 +156,134 @@ class FetchData:
     Calibrate them by substracting base
     So we get diffs[][]
     '''
+
     def fetch_ch_data(self):
-        
+
         # self.base = np.zeros((self.totalChannel, WINDOW_SIZE))
-        self.test = [0]*WINDOW_SIZE
+        self.test = [0] * WINDOW_SIZE
         start_time = time.time()
         result = self.arduino_port.readline().decode()
         # print(("result"))
         # print((result))
         result_arr = result.split(", ")
-        # print(len(result_arr))
+        print("result_arr")
+        print(result_arr)
         for i in range(self.r):
             for j in range(self.c):
                 for k in range(self.layer):
                     # fill in self.data from zero to arduino_port
-                    self.data[k][i*self.c + j][:-1] = self.data[k][i*self.c + j][1:]
-                    self.data[k][i*self.c + j][-1] = int(result_arr[i*self.c * self.layer + j*self.layer+k])
+                    self.data[k][i * self.c + j][:-1] = self.data[k][i * self.c + j][1:]
+                    self.data[k][i * self.c + j][-1] = int(result_arr[i * self.c * self.layer + j * self.layer + k])
                     if self.calibration:
-                        self.base[k][i*self.c + j] = copy.deepcopy(self.data[k][i*self.c + j])
+                        self.base[k][i * self.c + j] = copy.deepcopy(self.data[k][i * self.c + j])
 
         # print ("record took " +str(time.time()-start_time)+ "s")
-        self.recgMaterial()    #TODO cancel #
-        self.calDiff()
+        self.calDiff()  # now we get diff[][]
+        self.recgMaterial()  # TODO cancel #
+
         # self.adjustPeak()
         # self.scaleDiff()
-        #self.cancelSingleCap()
+#        self.cancelSingleCap2() # self.cancelSingleCap()
         if self.calibration:
-            self.calibration = False   
+            self.calibration = False
         if self.recalibration:
-            self.calibration = True  
+            self.calibration = True
             self.recalibration = False
         # time.sleep(0.01)
-        print("record took " +str(time.time()-start_time)+ "s")
+        print("record took " + str(time.time() - start_time) + "s")
 
     def processData(self, data):
-        return np.median(data)
+        return np.median(data)  # To get mediam number of data
 
     def adjustPeak(self):
         self.isTouch = False
-        for k in range(self.layer):                
+        for k in range(self.layer):
             for i in range(self.totalChannel):
                 diff = self.diffs[k][i]
                 if diff < 0 and not self.recalibration:
-                    if abs(diff) < CONDUCTIVE_THRESHOLD and abs(diff) > self.nonConductivePeak[k][i] :
+                    if abs(diff) < CONDUCTIVE_THRESHOLD and abs(diff) > self.nonConductivePeak[k][i]:
                         self.nonConductivePeak[k][i] = abs(diff)
                     elif abs(diff) >= CONDUCTIVE_THRESHOLD:
                         if abs(diff) > self.conductivePeak[k][i]:
-                            self.conductivePeak[k][i]= abs(diff)
+                            self.conductivePeak[k][i] = abs(diff)
                 elif diff > 0 and abs(diff) > self.capDecreasePeak[k][i] and not self.recalibration:
                     self.capDecreasePeak[k][i] = abs(diff)
-    def recgMaterial(self):
-        max_metrix=max(max(self.diffs))
-        print("Max of the metrix is ", max_metrix)
 
-        useful_points = []
-        cover_rate=0.9
-        for k in range(self.layer):
-            for i in range(self):
-                t = abs(self.diffs[k][index])
-                if(t > max_metrix * cover_rate):
-                    useful_points.append(t)
-        avr = np.mean(useful_points)    # avr
-        print("Average of this type is ", avr)
+
 
     '''
     Adjust diffs[][]
     '''
     def calDiff(self):
-        for k in range(self.layer):                
+        for k in range(self.layer):
             for i in range(self.totalChannel):
                 processed_data = self.processData(self.data[k][i])
                 processed_base = self.processData(self.base[k][i])
-                diff = processed_data-processed_base
+                diff = processed_data - processed_base
+                if(diff > 0):
+                    # self.base[k][i] = [processed_base]*WINDOW_SIZE
+                    diff = 0
+                else:
+                    diff = abs(diff)
+                print("diff")
+                print(diff)
                 self.diffs[k][i] = diff
+
+    def recgMaterial(self):
+        # To get diffs[][]
+        max_metrix = max(max((self.diffs)))
+        print("Max of the metrix is ", max_metrix)
+        useful_points = []
+        cover_rate = 0.9
+        for k in range(self.layer):
+            for i in range(self.r):
+                for j in range(self.c):
+                    index = i * self.c + j
+                    t = abs(self.diffs[k][index])
+                    if (t > max_metrix * cover_rate):
+                        useful_points.append(t)
+        avr = np.mean(useful_points)  # avr
+        print("Average of this type is ", avr)
 
     def scaleDiff(self):
         for k in range(self.layer):
             for i in range(self.totalChannel):
-                self.diffs[k][i] = self.diffs[k][i]/self.conductivePeak[k][i]
+                self.diffs[k][i] = self.diffs[k][i] / self.conductivePeak[k][i]
+
     '''
     Subtract abs(minimum) in column and raw for diffs[]
     '''
+
+    def cancelSingleCap2(self):
+        candidates = []
+        rate = 0.9
+        for k in range(self.layer):
+            for i in range(self.r):
+                row_caps = [(self.diffs[k][i * self.c + j]) for j in range(self.c)]
+                maximum = max(row_caps)
+                minimum = min(row_caps)
+
+                for j in range(self.c):
+                    index = i * self.c + j
+                    # if(self.diffs[k][index]) < maximum * rate :
+                    self.diffs[k][index] = ((self.diffs[k][index]) - minimum)
+                        # self.diffs[k][index] = 0
+
+            for j in range(self.c):
+                col_caps = [(self.diffs[k][i * self.c + j]) for i in range(self.r)]
+                col_caps_filter = list(filter(lambda c: c > NON_NOISE_THRESHOLD, col_caps))
+                print("filter")
+                print(col_caps_filter)
+                if len(col_caps_filter) == 0:
+                    continue
+                minimum = min(col_caps_filter)
+                maximum = max(col_caps_filter)
+
+                for i in range(self.r):
+                    index = i * self.c + j
+                    # if (self.diffs[k][index]) < maximum * rate:
+                    self.diffs[k][index] = ((self.diffs[k][index]) - minimum)
+                        # self.diffs[k][index] = 0
 
     def cancelSingleCap(self):
 
@@ -314,7 +362,6 @@ class FetchData:
 
     def start(self):
 
-
         # plt.ion()
         # fig = plt.figure()
 
@@ -346,11 +393,8 @@ class FetchData:
         #     exit()
 
 
-
 if __name__ == '__main__':
     (serialRead())
     # MSPComm("/dev/cu.usbmodem14141", "Test")
     fetchdata = FetchData()
     fetchdata.start()
-
-
