@@ -44,8 +44,9 @@ SINGLE_CAP_THRESHOLD = 50000
 ARDUINO_SERIAL_PORT = "COM4"
 CHANELL = 4
 SUPPORTED_ACTION_NUM = 50
-ACTION_ENERGY_THRESHOLD = 40000
+ACTION_ENERGY_THRESHOLD = 15000
 OBJECT_ENERGY_THRESHOLD = 1000
+
 # categorization
 
 
@@ -91,7 +92,9 @@ class FetchData:
         self.index = 0
         self.action = np.zeros((SUPPORTED_ACTION_NUM))
         self.lastData = np.zeros((self.layer, self.totalChannel, WINDOW_SIZE))
-        self.bias = np.zeros((SUPPORTED_ACTION_NUM, self.layer, self.totalChannel))
+        self.objectEnergy = np.zeros((SUPPORTED_ACTION_NUM, self.layer, self.totalChannel))
+        self.min_energy = 0
+        self.last_down_data = 0
 
         self.arduino_port = serial.Serial(port=ARDUINO_SERIAL_PORT, baudrate=250000)
         self.arduino_port.reset_input_buffer()
@@ -187,6 +190,7 @@ class FetchData:
         result_arr = result.split(", ")
         # print("result_arr")
         # print(result_arr)  # no increase
+
         for i in range(self.r):
             for j in range(self.c):
                 for k in range(self.layer):
@@ -198,52 +202,68 @@ class FetchData:
                         self.base[k][i * self.c + j] = copy.deepcopy(self.data[k][i * self.c + j])
                         # self.action[self.index] = 1
         if self.start_object_recog:
-            min_energy = 0
-
             for k in range(self.layer):
                 processed_data = np.array([self.processData(self.data[k][i]) for i in range(self.totalChannel)])
                 processed_base = np.array([self.processData(self.base[k][i]) for i in range(self.totalChannel)])
-                t_base = np.mean(processed_base)
-                t_data = np.mean(processed_data)    # !!! DECREASE when non-conductive
-                average_energy = t_base - t_data
-                # print("AVERAGE ENERGY = " + str(t_data) + '-' + str(t_base) + '=' + str(average_energy)
-                #print('average_energy' + str(average_energy))
-                #print('average_energy - min_energy' + str(average_energy - min_energy))
+                realtime_base = np.mean(processed_base)
+                realtime_data = np.mean(processed_data)    # !!! DECREASE when non-conductive
+                real_time_energy = - (realtime_data - realtime_base)
+                # print("real_time_energy = " + str(t_data) + '-' + str(t_base) + '=' + str(real_time_energy))    # always under
 
-
-                if average_energy > ACTION_ENERGY_THRESHOLD:
-                    self.bias[self.index][k] = average_energy
-                    if self.index==0:
-                        min_energy = 999999999
-                    elif average_energy < min_energy:
-                        min_energy = average_energy
+                if realtime_data - self.last_down_data > OBJECT_ENERGY_THRESHOLD:
+                    print("realtime_data - self.last_down_data: " + str(realtime_data) + " - " + str(self.last_down_data) + " = " + str(realtime_data - self.last_down_data))
+                '''
+                if sth new is placed, then : 
+                    1. add self.action[index], self.objectEnergy[index]
+                    2. check and update value of min_energy
+                    3. update base, index, last_down_data
+                '''
+                if real_time_energy > ACTION_ENERGY_THRESHOLD:  # True when sth placed
+                    # 1. add self.action[index], self.objectEnergy[index]
+                    self.objectEnergy[self.index][k] = real_time_energy
                     self.action[self.index] = 1
-                    self.index += 1
+                    # print("self.action["+str(self.index)+"]=1 Success!" + str(self.action[self.index]))
+
+                    # 2. check and update value of min_energy
+                    if self.index == 0:
+                        self.min_energy = real_time_energy
+                    elif real_time_energy < self.min_energy:
+                        self.min_energy = real_time_energy
+                    # print("self.min_energy: " + str(self.min_energy))
+
+                    # 3. update base, index, last_down_data
                     self.base[k] = copy.deepcopy(self.data[k])
-                    print("ACTION DOWN INDEX" + str(self.index))
-                elif (average_energy - min_energy) < 0:  # True when object UP
-                    print("signal decreasing")
+
+                    print("ACTION DOWN INDEX " + str(self.index) + ' energy '+str(real_time_energy))
+                    self.index += 1
+                    self.last_down_data = realtime_data
+
+
+                elif ((realtime_data - self.last_down_data) - self.min_energy) > 0:  # True when object UP
+                    #print("min_energy: "+str(min_energy))
+                    #print("signal decreasing")
                     for i in range(self.index):
-                        print('self.index' + str(self.index))
-                        if self.action[self.index] == 1:
-                            print("Index==1 detected.")
-                            #bias_energy = self.calculateEnergy(self.bias[self.index][k])
-                            bias_energy = self.bias[self.index][k]
-                            print('bias_energy - average_energy' + str(bias_energy - average_energy))
-                            if bias_energy - average_energy < OBJECT_ENERGY_THRESHOLD: # True when things go UP
+                        # print("action["+str(i)+"]" + str(self.action[i]))
+                        if self.action[i] == 1:
+                            # print("action[index]==1 detected.")
+                            # object_energy = self.calculateEnergy(self.objectEnergy[self.index][k])
+                            object_energy = np.mean(self.objectEnergy[i][k])  # energy of object i
+                            #print("energy of object  "+str(i)+" is  " + str(object_energy))
+                            # print('real_time_energy - object_energy = ' + str(real_time_energy)  + ' - ' + str(object_energy) + '=' + str(object_energy - real_time_energy))
+                            if abs(abs(realtime_data - self.last_down_data) - abs(object_energy)) < abs(object_energy) * 1.5:    # OBJECT_ENERGY_THRESHOLD: # True when things REALLY go UP
                                 self.action[i] = 0
                                 # self.index += 1
                                 self.base[k] = copy.deepcopy(self.data[k])
-                                print("ACTION UP INDEX" + str(self.index))
+                                print("ACTION UP INDEX" + str(i))
                                 break
-                    #print(":) No match this time :)")
+
             # for i in range(self.totalChannel):
             #     before_data = self.cur[k][i]
             #     changed_data = self.chg[k][i]
-            #     self.bias[self.index][k][i] = changed_data - before_data
+            #     self.objectEnergy[self.index][k][i] = changed_data - before_data
                 # bias[index][k][i] = 0
         # print("Bias: ")
-        # print(self.bias[self.index])
+        # print(self.objectEnergy[self.index])
 
         self.lastData = copy.deepcopy(self.data)
         # print ("record took " +str(time.time()-start_time)+ "s")
