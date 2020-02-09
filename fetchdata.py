@@ -44,7 +44,7 @@ SINGLE_CAP_THRESHOLD = 50000
 ARDUINO_SERIAL_PORT = "COM4"
 CHANELL = 4
 SUPPORTED_ACTION_NUM = 50
-ACTION_ENERGY_THRESHOLD = 30000
+ACTION_ENERGY_THRESHOLD = 40000
 OBJECT_ENERGY_THRESHOLD = 1000
 # categorization
 
@@ -122,12 +122,14 @@ class FetchData:
                 if self.conn:
                     print('Connected by', addr)
 
+
+    def calculateEnergy(self, values):
+        return -(np.mean(values))
+
     '''
     Process values and then send them all out by send()
     Read diffs[][], calculate and get ch[].
     '''
-    def calculateEnergy(self, values):
-        return -(np.mean(values))
     def sender(self):
         while 1:
             self.fetch_ch_data()
@@ -196,36 +198,45 @@ class FetchData:
                         self.base[k][i * self.c + j] = copy.deepcopy(self.data[k][i * self.c + j])
                         # self.action[self.index] = 1
         if self.start_object_recog:
+            min_energy = 0
+
             for k in range(self.layer):
-                #for i in range(self.totalChannel):
-                    #print("self.processData(self.data[k][i])  " + str(self.processData(self.data[k][i])))
                 processed_data = np.array([self.processData(self.data[k][i]) for i in range(self.totalChannel)])
-                #print("processed_data" + str(np.mean(processed_data)))
                 processed_base = np.array([self.processData(self.base[k][i]) for i in range(self.totalChannel)])
-                #print("processed_base" + str(ncalculateEnergyp.mean(processed_base)))
-                #average_energy = self.calculateEnergy(processed_data - processed_base)
                 t_base = np.mean(processed_base)
                 t_data = np.mean(processed_data)    # !!! DECREASE when non-conductive
-                average_energy = t_data - t_base
+                average_energy = t_base - t_data
+                # print("AVERAGE ENERGY = " + str(t_data) + '-' + str(t_base) + '=' + str(average_energy)
+                #print('average_energy' + str(average_energy))
+                #print('average_energy - min_energy' + str(average_energy - min_energy))
 
-                print("AVERAGE ENERGY = " + str(t_data) + '-' + str(t_base) + '=' + str(average_energy))
-                #print("AVERAGE ENERGY = " + str(average_energy))
+
                 if average_energy > ACTION_ENERGY_THRESHOLD:
-                    self.bias[self.index][k] = processed_data - processed_base
+                    self.bias[self.index][k] = average_energy
+                    if self.index==0:
+                        min_energy = 999999999
+                    elif average_energy < min_energy:
+                        min_energy = average_energy
                     self.action[self.index] = 1
                     self.index += 1
                     self.base[k] = copy.deepcopy(self.data[k])
                     print("ACTION DOWN INDEX" + str(self.index))
-                elif average_energy < -ACTION_ENERGY_THRESHOLD:
+                elif (average_energy - min_energy) < 0:  # True when object UP
+                    print("signal decreasing")
                     for i in range(self.index):
+                        print('self.index' + str(self.index))
                         if self.action[self.index] == 1:
-                            bias_energy = self.calculateEnergy(self.bias[self.index][k])
-                            if abs(bias_energy - average_energy) < OBJECT_ENERGY_THRESHOLD:
+                            print("Index==1 detected.")
+                            #bias_energy = self.calculateEnergy(self.bias[self.index][k])
+                            bias_energy = self.bias[self.index][k]
+                            print('bias_energy - average_energy' + str(bias_energy - average_energy))
+                            if bias_energy - average_energy < OBJECT_ENERGY_THRESHOLD: # True when things go UP
                                 self.action[i] = 0
                                 # self.index += 1
                                 self.base[k] = copy.deepcopy(self.data[k])
                                 print("ACTION UP INDEX" + str(self.index))
                                 break
+                    #print(":) No match this time :)")
             # for i in range(self.totalChannel):
             #     before_data = self.cur[k][i]
             #     changed_data = self.chg[k][i]
