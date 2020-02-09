@@ -43,6 +43,10 @@ SINGLE_CAP_THRESHOLD = 50000
 # Specific Port related to your device
 ARDUINO_SERIAL_PORT = "COM4"
 CHANELL = 4
+SUPPORTED_ACTION_NUM = 50
+ACTION_ENERGY_THRESHOLD = 30000
+OBJECT_ENERGY_THRESHOLD = 1000
+# categorization
 
 
 def serialRead():
@@ -59,11 +63,11 @@ def serialRead():
             serialNum += 1
     return serialNum, serialDict
 
-
 class FetchData:
     '''
     Function: Build by set FDC and start sensor
     '''
+
 
     def __init__(self):
         # second
@@ -82,10 +86,17 @@ class FetchData:
 
         self.data = np.zeros((self.layer, self.totalChannel, WINDOW_SIZE))
         self.base = np.zeros((self.layer, self.totalChannel, WINDOW_SIZE))
+        # self.cur = np.zeros((self.layer, self.totalChannel, WINDOW_SIZE))
+        # self.chg = np.zeros((self.layer, self.totalChannel, WINDOW_SIZE))
+        self.index = 0
+        self.action = np.zeros((SUPPORTED_ACTION_NUM))
+        self.lastData = np.zeros((self.layer, self.totalChannel, WINDOW_SIZE))
+        self.bias = np.zeros((SUPPORTED_ACTION_NUM, self.layer, self.totalChannel))
 
         self.arduino_port = serial.Serial(port=ARDUINO_SERIAL_PORT, baudrate=250000)
         self.arduino_port.reset_input_buffer()
         # time.sleep(1)
+        self.start_object_recog = False;
         self.arduino_port.dsrdtr = 0
         # time.sleep(1)
         self.reset()
@@ -100,7 +111,12 @@ class FetchData:
                 if data:
                     d = data.decode("utf-8")
                     if d.strip() == "reset":
-                        self.reset()
+                        #s_beforeC = data
+                        # self.getCurrent()   # fresh cur[k][i], to save data before changed
+                        self.reset()    # fresh base, to save new base
+                        # self.getChanged()   # get actual signal after placing objects
+                        self.start_object_recog = True;
+
             else:
                 self.conn, addr = self.mysocket.accept()
                 if self.conn:
@@ -110,7 +126,8 @@ class FetchData:
     Process values and then send them all out by send()
     Read diffs[][], calculate and get ch[].
     '''
-
+    def calculateEnergy(self, values):
+        return -(np.mean(values))
     def sender(self):
         while 1:
             self.fetch_ch_data()
@@ -146,7 +163,7 @@ class FetchData:
             # print("Low Peak: " + ' '.join(str(e) for e in self.nonConductivePeak) + '\n')
             # print("Upper Peak: " + ' '.join(str(e) for e in self.capDecreasePeak) + '\n')
             # print("Pre Deformed Data: " + ' '.join(str(e) for e in self.pre_deformed_data) + '\n')
-            print("Value: " + ' '.join(str(e) for e in ch) + '\n')  # TODO cancel #
+           # print("Value: " + ' '.join(str(e) for e in ch) + '\n')
             # print("isConductive: " + ' '.join(str(e) for e in isConductive) +'\n')
             # self.conn.send(' '.join(str(e) for e in rawch) + '\n')
             # time.sleep(self.send_time)
@@ -166,8 +183,8 @@ class FetchData:
         # print(("result"))
         # print((result))
         result_arr = result.split(", ")
-        print("result_arr")
-        print(result_arr)
+#        print("result_arr")
+#        print(result_arr)
         for i in range(self.r):
             for j in range(self.c):
                 for k in range(self.layer):
@@ -176,10 +193,41 @@ class FetchData:
                     self.data[k][i * self.c + j][-1] = int(result_arr[i * self.c * self.layer + j * self.layer + k])
                     if self.calibration:
                         self.base[k][i * self.c + j] = copy.deepcopy(self.data[k][i * self.c + j])
+                        # self.action[self.index] = 1
+        if self.start_object_recog:
+            for k in range(self.layer):
+                processed_data = np.array([self.processData(self.data[k][i]) for i in range(self.totalChannel)])
+                processed_base = np.array([self.processData(self.base[k][i]) for i in range(self.totalChannel)])
+                average_energy = self.calculateEnergy(processed_data - processed_base)
+                print("AVERAGE ENERGY  " + str(average_energy))
+                if average_energy > ACTION_ENERGY_THRESHOLD:
+                    self.bias[self.index][k] = processed_data - processed_base
+                    self.action[self.index] = 1
+                    self.index += 1
+                    self.base[k] = copy.deepcopy(self.data[k])
+                    print("ACTION DOWN INDEX" + str(self.index))
+                elif average_energy < -ACTION_ENERGY_THRESHOLD:
+                    for i in range(self.index):
+                        if self.action[self.index] == 1:
+                            bias_energy = self.calculateEnergy(self.bias[self.index][k])
+                            if abs(bias_energy - average_energy) < OBJECT_ENERGY_THRESHOLD:
+                                self.action[i] = 0
+                                # self.index += 1
+                                self.base[k] = copy.deepcopy(self.data[k])
+                                print("ACTION UP INDEX" + str(self.index))
+                                break
+            # for i in range(self.totalChannel):
+            #     before_data = self.cur[k][i]
+            #     changed_data = self.chg[k][i]
+            #     self.bias[self.index][k][i] = changed_data - before_data
+                # bias[index][k][i] = 0
+        # print("Bias: ")
+        # print(self.bias[self.index])
 
+        self.lastData = copy.deepcopy(self.data)
         # print ("record took " +str(time.time()-start_time)+ "s")
         self.calDiff()  # now we get diff[][]
-        self.recgMaterial()  # TODO cancel #
+        # self.recgMaterial()  # TODO cancel #
 
         # self.adjustPeak()
         # self.scaleDiff()
@@ -190,7 +238,7 @@ class FetchData:
             self.calibration = True
             self.recalibration = False
         # time.sleep(0.01)
-        print("record took " + str(time.time() - start_time) + "s")
+#        print("record took " + str(time.time() - start_time) + "s")
 
     def processData(self, data):
         return np.median(data)  # To get mediam number of data
@@ -208,8 +256,31 @@ class FetchData:
                             self.conductivePeak[k][i] = abs(diff)
                 elif diff > 0 and abs(diff) > self.capDecreasePeak[k][i] and not self.recalibration:
                     self.capDecreasePeak[k][i] = abs(diff)
+    '''
+    get current signal
+    '''
 
+    def getCurrent(self):
+        for k in range(self.layer):
+            for i in range(self.totalChannel):
+                processed_data = self.processData(self.data[k][i])
+                processed_base = self.processData(self.base[k][i])
+                diff = processed_data
+                self.cur[k][i] = diff
+                print("current diff: ")
+                print(diff)
+        # now we get current signal of the whole map
 
+    def getChanged(self):
+        for k in range(self.layer):
+            for i in range(self.totalChannel):
+                processed_data = self.processData(self.data[k][i])
+                processed_base = self.processData(self.base[k][i])
+                diff = processed_base
+                self.chg[k][i] = diff
+                print("changed diff: ")
+                print(diff)
+        # now we get current signal of the whole map after changing
 
     '''
     Adjust diffs[][]
@@ -225,14 +296,21 @@ class FetchData:
                     diff = 0
                 else:
                     diff = abs(diff)
-                print("diff")
-                print(diff)
+#                print("diff")
+#                print(diff)
                 self.diffs[k][i] = diff
+
+    def returnCalDiff(self):
+        for k in range(self.layer):
+            for i in range(self.totalChannel):
+                processed_data = self.processData(self.data[k][i])
+                processed_base = self.processData(self.base[k][i])
+                return processed_data, processed_base
 
     def recgMaterial(self):
         # To get diffs[][]
         max_metrix = max(max((self.diffs)))
-        print("Max of the metrix is ", max_metrix)
+#        print("Max of the metrix is ", max_metrix)
         useful_points = []
         cover_rate = 0.9
         for k in range(self.layer):
@@ -243,7 +321,7 @@ class FetchData:
                     if (t > max_metrix * cover_rate):
                         useful_points.append(t)
         avr = np.mean(useful_points)  # avr
-        print("Average of this type is ", avr)
+#        print("Average of this type is ", avr)
 
     def scaleDiff(self):
         for k in range(self.layer):
@@ -358,6 +436,7 @@ class FetchData:
         self.capDecreasePeak = np.ones((self.layer, self.totalChannel)) * CAP_DECREASE_PEAK
         self.arduino_port.write("reset\n".encode())
         self.diffs = np.zeros((self.layer, self.totalChannel))
+
         # self.pre_deformed_data = np.ones((self.layer, self.totalChannel))
 
     def start(self):
