@@ -183,23 +183,33 @@ class FetchData:
         # print(("result"))
         # print((result))
         result_arr = result.split(", ")
-#        print("result_arr")
-#        print(result_arr)
+        # print("result_arr")
+        # print(result_arr)  # no increase
         for i in range(self.r):
             for j in range(self.c):
                 for k in range(self.layer):
                     # fill in self.data from zero to arduino_port
                     self.data[k][i * self.c + j][:-1] = self.data[k][i * self.c + j][1:]
+#                    print("self.data " + str(self.data))  # no increase
                     self.data[k][i * self.c + j][-1] = int(result_arr[i * self.c * self.layer + j * self.layer + k])
                     if self.calibration:
                         self.base[k][i * self.c + j] = copy.deepcopy(self.data[k][i * self.c + j])
                         # self.action[self.index] = 1
         if self.start_object_recog:
             for k in range(self.layer):
+                #for i in range(self.totalChannel):
+                    #print("self.processData(self.data[k][i])  " + str(self.processData(self.data[k][i])))
                 processed_data = np.array([self.processData(self.data[k][i]) for i in range(self.totalChannel)])
+                #print("processed_data" + str(np.mean(processed_data)))
                 processed_base = np.array([self.processData(self.base[k][i]) for i in range(self.totalChannel)])
-                average_energy = self.calculateEnergy(processed_data - processed_base)
-                print("AVERAGE ENERGY  " + str(average_energy))
+                #print("processed_base" + str(ncalculateEnergyp.mean(processed_base)))
+                #average_energy = self.calculateEnergy(processed_data - processed_base)
+                t_base = np.mean(processed_base)
+                t_data = np.mean(processed_data)    # !!! DECREASE when non-conductive
+                average_energy = t_data - t_base
+
+                print("AVERAGE ENERGY = " + str(t_data) + '-' + str(t_base) + '=' + str(average_energy))
+                #print("AVERAGE ENERGY = " + str(average_energy))
                 if average_energy > ACTION_ENERGY_THRESHOLD:
                     self.bias[self.index][k] = processed_data - processed_base
                     self.action[self.index] = 1
@@ -241,6 +251,9 @@ class FetchData:
 #        print("record took " + str(time.time() - start_time) + "s")
 
     def processData(self, data):
+
+        # print('np.median(data)')
+        # print(np.median(data)) # no increase
         return np.median(data)  # To get mediam number of data
 
     def adjustPeak(self):
