@@ -77,8 +77,8 @@ class FetchData:
         self.mysocket.bind(('localhost', 5000))
         self.mysocket.listen(1)
         self.conn = None
-        self.r = 8
-        self.c = 8
+        self.r = 16
+        self.c = 16
         self.layer = 1
         self.recalibration = False
         self.calibration = True
@@ -251,8 +251,8 @@ class FetchData:
 
 
                     for i in range(self.r * self.c):
-                        self.position[self.index][i//8][i%8] = energy_metrix[i] / 100000
-                        print("self.position[" + str(self.index) + '][' + str(i//8) + '][' + str(i%8) + '] = ' + str(self.position[self.index][i//8][i%8]))
+                        self.position[self.index][i//self.r][i % self.c] = energy_metrix[i] / 100000
+                        print("self.position[" + str(self.index) + '][' + str(i//self.r) + '][' + str(i%self.c) + '] = ' + str(self.position[self.index][i//self.r][i%self.c]))
                     '''
                     fig = plt.figure()
                     ax = Axes3D(fig)

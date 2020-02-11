@@ -1,9 +1,9 @@
 #include <Wire.h>
 #include "FDC2214.h"
-const int rows = 8;
-const int columns = 8;
-int mux_num = 4;
-int mux_control_pins[4][3] = {{2, 3, 4}, {5, 6, 7}, {8, 9, 10}, {11, 12, 13}};
+const int rows = 16;
+const int columns = 16;
+int mux_num = 8;
+int mux_control_pins[8][3] = {{23, 25, 27}, {29, 31, 33}, {35, 37, 39}, {41, 43, 45}, {2, 3, 4}, {5,6,7}, {8,9,10}, {11,12,13}};
 FDC2214 capsense(FDC2214_I2C_ADDR_0); // Use FDC2214_I2C_ADDR_1 
 String inputString = "";         // a String to hold incoming data
 bool stringComplete = false;  // whether the string is complete
@@ -61,8 +61,8 @@ void loop() {
             }
           }
 //          Serial.print(i*columns + j);
-//          delayMicroseconds(100);
-            delay(1);
+          delayMicroseconds(100);
+//            delay(1);
           
 //          Serial.print(", ");
           unsigned long capa[CHAN_COUNT]; // variable to store data from FDC

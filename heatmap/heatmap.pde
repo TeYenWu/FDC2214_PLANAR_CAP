@@ -8,8 +8,8 @@ Client myClient;
 int dataIn; 
 
 Serial myPort;        // The serial port
-int r = 8;         // horizontal position of the graph
-int c = 8;
+int r = 16;         // horizontal position of the graph
+int c = 16;
 int layer = 1;
 
 float values[][] = new float[layer][r*c];
@@ -27,14 +27,15 @@ color c4 = color(200, 0, 0); //red
 color c_w = color(255,255,255);
 color c_b = color(0,0,0);
 BlobDetection theBlobDetection;
-int interp_values[] = new int[1500000];
+int interp_values[] = new int[3000000];
 int heatMapGap = 350;
 float diffValues[] = new float[r*c];
 
 void setup () {
   // set the window size:
   //fullScreen();
-  size(1000,1000);
+  textSize(10);
+  size(1600,1600);
   // init socket client
   myClient = new Client(this, "127.0.0.1", 5000);
   // set initial background:
