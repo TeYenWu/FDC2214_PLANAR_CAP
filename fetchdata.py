@@ -89,6 +89,9 @@ class FetchData:
         self.index = 0
         self.action = np.zeros((SUPPORTED_ACTION_NUM))
         self.energy_metrix = np.zeros((SUPPORTED_ACTION_NUM, self.r, self.c))
+        self.position = np.zeros((SUPPORTED_ACTION_NUM))  # the current poition(X*self.r+Y) of object(index)
+        self.move = np.zeros((SUPPORTED_ACTION_NUM))  # if the position stays unchanged, move = false, else true
+        self.track = np.zeros((SUPPORTED_ACTION_NUM))  # the position history of object(index)
 
         self.lastData = np.zeros((self.layer, self.totalChannel, WINDOW_SIZE))
         self.objectEnergy = np.zeros((SUPPORTED_ACTION_NUM, self.layer, self.totalChannel))
@@ -187,6 +190,8 @@ class FetchData:
 
     def fetch_ch_data(self):
 
+        self.timingTrack()  # tracking the position history of object
+
         # self.base = np.zeros((self.totalChannel, WINDOW_SIZE))
         self.test = [0] * WINDOW_SIZE
         start_time = time.time()
@@ -245,11 +250,18 @@ class FetchData:
                     # self.calPosition()
                     self.index += 1
                     self.last_down_data = realtime_data
-
-
+                    '''
                     for i in range(self.r * self.c):
-                        self.energy_metrix[self.index][i//self.r][i % self.c] = energy_metrix[i] / 100000
-                        print("self.energy_metrix[" + str(self.index) + '][' + str(i//self.r) + '][' + str(i%self.c) + '] = ' + str(self.energy_metrix[self.index][i//self.r][i%self.c]))
+                        self.energy_metrix[self.index][i//self.r][i % self.c] = energy_metrix[i] / 1000
+                        #print(str(self.index - 1) + "Line: " + str(i // self.r) , end = ' ')
+                        #for j in range(self.c):
+                        #print("self.energy_metrix[" + str(self.index) + '][' + str(i // self.r) + '][' + str(
+                                #i % self.c) + '] = ' + str(self.energy_metrix[self.index][i // self.r][i % self.c]), end = ' ')
+                        print("self.energy_metrix[" + str(self.index) + '][' + str(i // self.r) + '] = ' + str(np.mean(self.energy_metrix[self.index][i // self.r])), end = ' ')
+                            #print(self.energy_metrix[self.index][i // self.r][i % self.c], end = ' ')
+                            #print(self.energy_metrix[self.index-1][i // self.r][i % self.c], end = ' ')
+                    '''
+
                     '''
                     fig = plt.figure()
                     ax = Axes3D(fig)
@@ -332,9 +344,19 @@ class FetchData:
         # time.sleep(0.01)
 #        print("record took " + str(time.time() - start_time) + "s")
 
+    # every thread, check and record the position history of every object(from indexMin to indexMax)
+    def timingTrack(self):
+        print("Hello")
+        for i in range(self.index):
+            if self.action[self.index] == 1:  # object(index) is down
+                if self.getCurrntPosition(self.index) == self.position[self.index]:
+                    self.move[self.index] = False  # position of the object(index) stay unchanged
+                else:
+                    self.move[self.index] = True  # position of the object(index) changed
+                    self.track[self.index] = self.track[self.index] + ' ' + str(self.position[self.index]) + ' '
 
-
-
+    def getCurrntPosition(self):
+        return self.position[self.index]
 
     def processData(self, data):
 
