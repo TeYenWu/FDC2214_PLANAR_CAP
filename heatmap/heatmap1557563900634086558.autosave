@@ -34,7 +34,6 @@ float diffValues[] = new float[r*c];
 void setup () {
   // set the window size:
   //fullScreen();
-  textSize(10);
   size(1000,1000);
   // init socket client
   myClient = new Client(this, "127.0.0.1", 5000);
@@ -111,10 +110,10 @@ float[][] bilinearInterpolation(float[] values){
 
 color getGradientColor(float value, float maxValue){
   color c = color(0,0,0);
-  if(value < maxValue/5){
+  if(value < maxValue/3){
     c = lerpColor(c1, c2, value/(maxValue/3));
   } else if(value < maxValue * 2/3){
-    c = lerpColor(c2, c3, (value -  maxValue/5)/(maxValue/3));
+    c = lerpColor(c2, c3, (value -  maxValue/3)/(maxValue/3));
   } else {
     c = lerpColor(c3, c4, (value -  maxValue*2/3)/(maxValue/3));
   }
@@ -131,30 +130,16 @@ void fillHeatMap(){
   loadPixels();
   for (int k = 0; k < layer; k++){
     float interp_array[][] = bilinearInterpolation(values[k]);
-    float max_positive = 0;
-    float max_negative = 0;
-    for(int y=0; y < cellSize*r; y++){
-      for(int x = 0; x < cellSize*c; x++){
-        if((interp_array[y][x] > 0) && (max_positive < interp_array[y][x])){
-          max_positive = interp_array[y][x];
-        }
-        if((interp_array[y][x] < 0) && (max_negative > interp_array[y][x])){
-          max_negative = interp_array[y][x];
-        }
-      }
-    }
-          
-        
     for(int y=0; y < cellSize*r; y++){
       for(int x = 0; x < cellSize*c; x++){
             color c =  color(0,0,0);
             
             if(interp_array[y][x]<0){
              interp_values[y*width+x+k*heatMapGap] = int(-interp_array[y][x]*255);
-              c = getGrayGradientColor(interp_array[y][x], max_negative);
+              c = getGrayGradientColor(interp_array[y][x], -1);
             } else{
              
-              c = getGradientColor(interp_array[y][x], max_positive);
+              c = getGradientColor(interp_array[y][x], 1);
             }
             pixels[y*width+x+k*heatMapGap] = c;
       }
@@ -258,7 +243,7 @@ void draw () {
     for (int i = 0; i < r * c; i++){
       print();
       fill(0, 102, 153);
-      textSize(16);
+      textSize(18);
       
       text(nf(values[k][i], 1, 3), (c-i%c-1)*cellSize + cellSize / 2 + k*heatMapGap, (r- i/c-1)*cellSize + cellSize / 2); 
        

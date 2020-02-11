@@ -3,7 +3,7 @@
 const int rows = 16;
 const int columns = 16;
 int mux_num = 8;
-int mux_control_pins[8][3] = {{23, 25, 27}, {29, 31, 33}, {35, 37, 39}, {41, 43, 45}, {2, 3, 4}, {5,6,7}, {8,9,10}, {11,12,13}};
+int mux_control_pins[8][3] = {{25, 27,23}, {31, 33,29}, {37, 39, 35}, {43, 45, 41}, {2, 3, 4}, {5,6,7}, {8,9,10}, {11,12,13}};
 FDC2214 capsense(FDC2214_I2C_ADDR_0); // Use FDC2214_I2C_ADDR_1 
 String inputString = "";         // a String to hold incoming data
 bool stringComplete = false;  // whether the string is complete
