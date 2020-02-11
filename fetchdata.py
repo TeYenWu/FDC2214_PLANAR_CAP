@@ -68,11 +68,8 @@ class FetchData:
     '''
     Function: Build by set FDC and start sensor
     '''
-
-
     def __init__(self):
         # second
-
         self.mysocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.mysocket.bind(('localhost', 5000))
         self.mysocket.listen(1)
@@ -91,7 +88,7 @@ class FetchData:
         # self.chg = np.zeros((self.layer, self.totalChannel, WINDOW_SIZE))
         self.index = 0
         self.action = np.zeros((SUPPORTED_ACTION_NUM))
-        self.position = np.zeros((SUPPORTED_ACTION_NUM, self.r, self.c))
+        self.energy_metrix = np.zeros((SUPPORTED_ACTION_NUM, self.r, self.c))
 
         self.lastData = np.zeros((self.layer, self.totalChannel, WINDOW_SIZE))
         self.objectEnergy = np.zeros((SUPPORTED_ACTION_NUM, self.layer, self.totalChannel))
@@ -153,7 +150,7 @@ class FetchData:
             ''' unlike ch(if diff[]>0 diff[]=0), zh is raw data - base
             zh = []
             for i in range(self.r * self.c):
-                zh.append(self.position[self.index][i//8][i % 8])
+                zh.append(self.energy_metrix[self.index][i//8][i % 8])
             '''
 
                 # print (data[i]-base[i])
@@ -251,8 +248,8 @@ class FetchData:
 
 
                     for i in range(self.r * self.c):
-                        self.position[self.index][i//self.r][i % self.c] = energy_metrix[i] / 100000
-                        print("self.position[" + str(self.index) + '][' + str(i//self.r) + '][' + str(i%self.c) + '] = ' + str(self.position[self.index][i//self.r][i%self.c]))
+                        self.energy_metrix[self.index][i//self.r][i % self.c] = energy_metrix[i] / 100000
+                        print("self.energy_metrix[" + str(self.index) + '][' + str(i//self.r) + '][' + str(i%self.c) + '] = ' + str(self.energy_metrix[self.index][i//self.r][i%self.c]))
                     '''
                     fig = plt.figure()
                     ax = Axes3D(fig)
@@ -262,8 +259,8 @@ class FetchData:
                     Z = np.zeros((len(X), len(Y)))
                     for a in range(8):
                         for b in range(8):
-                            #print("Z[a, b] = self.position[self.index][a][b]: " + str(self.position[self.index][a][b]))
-                            Z[a, b] = self.position[self.index][a][b]
+                            #print("Z[a, b] = self.energy_metrix[self.index][a][b]: " + str(self.energy_metrix[self.index][a][b]))
+                            Z[a, b] = self.energy_metrix[self.index][a][b]
 
                     ax.plot_surface(X, Y, Z, rstride=1, cstride=1, cmap='rainbow')
                     plt.show()
@@ -279,10 +276,10 @@ class FetchData:
                     x, y = np.mgrid[0:7:8j, 0:7:8j]
                     print("Type of x:")
                     print(type(x))
-                    #z = self.position[self.index][x][y] # ???
+                    #z = self.energy_metrix[self.index][x][y] # ???
                     z_t = []
                     for i in range(self.r * self.c):
-                        z_t.append(self.position[self.index][i//8][i%8])
+                        z_t.append(self.energy_metrix[self.index][i//8][i%8])
                     z = np.array(z_t)
 
                     colors = plt.cm.get_cmap('cool')

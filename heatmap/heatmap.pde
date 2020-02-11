@@ -111,10 +111,10 @@ float[][] bilinearInterpolation(float[] values){
 
 color getGradientColor(float value, float maxValue){
   color c = color(0,0,0);
-  if(value < maxValue/3){
+  if(value < maxValue/5){
     c = lerpColor(c1, c2, value/(maxValue/3));
   } else if(value < maxValue * 2/3){
-    c = lerpColor(c2, c3, (value -  maxValue/3)/(maxValue/3));
+    c = lerpColor(c2, c3, (value -  maxValue/5)/(maxValue/3));
   } else {
     c = lerpColor(c3, c4, (value -  maxValue*2/3)/(maxValue/3));
   }
@@ -131,16 +131,30 @@ void fillHeatMap(){
   loadPixels();
   for (int k = 0; k < layer; k++){
     float interp_array[][] = bilinearInterpolation(values[k]);
+    float max_positive = 0;
+    float max_negative = 0;
+    for(int y=0; y < cellSize*r; y++){
+      for(int x = 0; x < cellSize*c; x++){
+        if((interp_array[y][x] > 0) && (max_positive < interp_array[y][x])){
+          max_positive = interp_array[y][x];
+        }
+        if((interp_array[y][x] < 0) && (max_negative > interp_array[y][x])){
+          max_negative = interp_array[y][x];
+        }
+      }
+    }
+          
+        
     for(int y=0; y < cellSize*r; y++){
       for(int x = 0; x < cellSize*c; x++){
             color c =  color(0,0,0);
             
             if(interp_array[y][x]<0){
              interp_values[y*width+x+k*heatMapGap] = int(-interp_array[y][x]*255);
-              c = getGrayGradientColor(interp_array[y][x], -1);
+              c = getGrayGradientColor(interp_array[y][x], max_negative);
             } else{
              
-              c = getGradientColor(interp_array[y][x], 1);
+              c = getGradientColor(interp_array[y][x], max_positive);
             }
             pixels[y*width+x+k*heatMapGap] = c;
       }
