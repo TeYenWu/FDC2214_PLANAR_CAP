@@ -92,6 +92,8 @@ class FetchData:
         self.position = np.zeros((SUPPORTED_ACTION_NUM))  # the current poition(X*self.r+Y) of object(index)
         self.move = np.zeros((SUPPORTED_ACTION_NUM))  # if the position stays unchanged, move = false, else true
         self.track = np.zeros((SUPPORTED_ACTION_NUM))  # the position history of object(index)
+        self.tempIndex = 0
+        # (太难解释了，用了下中文:> )循环中的i不是self对象的类变量，不能作为getCurrentPosition()函数的参数，所以建立用来临时传参的变量self.tempIndex表示目前遍历到的物体的索引值以返回这个物体的currentPosition
 
         self.lastData = np.zeros((self.layer, self.totalChannel, WINDOW_SIZE))
         self.objectEnergy = np.zeros((SUPPORTED_ACTION_NUM, self.layer, self.totalChannel))
@@ -346,17 +348,20 @@ class FetchData:
 
     # every thread, check and record the position history of every object(from indexMin to indexMax)
     def timingTrack(self):
-        print("Hello")
+        # print("start tracking object")
         for i in range(self.index):
-            if self.action[self.index] == 1:  # object(index) is down
-                if self.getCurrntPosition(self.index) == self.position[self.index]:
-                    self.move[self.index] = False  # position of the object(index) stay unchanged
+            self.tempIndex = i
+            print(i)
+            if self.action[i] == 1:  # object(index) is down
+                if self.getCurrentPosition() == self.position[i]:
+                    print("object[" + str(i) + "] position unchanged")
+                    self.move[i] = False  # position of the object(index) stay unchanged
                 else:
-                    self.move[self.index] = True  # position of the object(index) changed
-                    self.track[self.index] = self.track[self.index] + ' ' + str(self.position[self.index]) + ' '
+                    self.move[i] = True  # position of the object(index) changed
+                    self.track[i] = self.track[i] + ' ' + str(self.position[i]) + ' '
 
-    def getCurrntPosition(self):
-        return self.position[self.index]
+    def getCurrentPosition(self):
+        return self.position[self.tempIndex]
 
     def processData(self, data):
 
