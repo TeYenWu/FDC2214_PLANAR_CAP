@@ -234,6 +234,7 @@ class FetchData:
                 # print("realtime_data - self.last_down_data: " + str(realtime_data) + " - " + str(self.last_down_data) + " = " + str(realtime_data - self.last_down_data))
                 '''
                 if sth new is placed, then : 
+                    0. Filter noise using position
                     1. add self.action[index], self.objectEnergy[index]
                     2. check and update value of min_energy
                     3. update base, index, last_down_data
@@ -317,7 +318,7 @@ class FetchData:
 
 
     def drawShape(self):
-        """For each object, draw its Shape, calculates its equivalent position point and energy.
+        """For each object at the moment, draw its Shape, calculates its equivalent position point and energy.
 
         :returns: coordinate refers to x_coordinate * 16 + y；center_energy
         """
@@ -329,7 +330,6 @@ class FetchData:
         # To get max energy
         max_energy = 0
         single_point_energy = []
-        # Get max energy for the object
         for i in range(self.r):
             for j in range(self.c):
                 # print("Type of self.energy: {}".format(type(self.energy_metrix)))
@@ -338,6 +338,7 @@ class FetchData:
                 if temp > max_energy:
                     max_energy = temp
                     area_threshold = AREA_PERCENT * max_energy
+
         count = 0  # number of processed points
         # Produce a selection of points to draw soon
         for i in range(self.r):
@@ -356,7 +357,6 @@ class FetchData:
             print("No point generated.")
             return 0
 
-
         point_set = points[0: count]     # remove extra empty points
         point_shaped = point_set.reshape(-1, (count + 1) // 2,
                                          2)  # reshape it to Object_number * (x,y); RESHAPE TO N*1*2
@@ -374,6 +374,7 @@ class FetchData:
         for i in range(0, len(point_set)):
             point_set[i] /= 50
         #print("Point_set: {}".format(point_set))
+
         # Calculate position and energy for capacity_center
         energy_sum = 0
         x_coordinate_energy_sum = 0
