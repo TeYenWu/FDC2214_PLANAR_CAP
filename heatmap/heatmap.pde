@@ -56,14 +56,14 @@ void updateValues(){
       String[] data = rawdata.split(" ");
       
       
-      //print("Data: ");
+      print("Data: ");
       for (int k = 0; k < layer; k++){
           for (int i = 0; i < r * c; i++){
           //if(i%r >=cutoff || i/r >=cutoff) continue;
           //if(i%r <=low_cutoff || i/r <=low_cutoff) continue;
           values[k][i] =  (Float.valueOf(data[i+k * r * c].trim()));
-          //print(values[k][i]);
-          //print(" ");
+          print(values[k][i]);
+          print(" ");
         }
       }
       

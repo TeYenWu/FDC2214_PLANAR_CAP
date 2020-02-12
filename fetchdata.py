@@ -49,10 +49,10 @@ CHANELL = 4
 SUPPORTED_ACTION_NUM = 100
 ACTION_ENERGY_THRESHOLD = 15000
 OBJECT_ENERGY_THRESHOLD = 1000
-MAX_DRAW_POINT = 20
+MAX_DRAW_POINT = 256
 AREA_PERCENT = 0.7
 CANVAS_WIDTH = 800
-CANVAS_HEIGHT = 400
+CANVAS_HEIGHT = 800
 
 
 # categorization
@@ -97,7 +97,8 @@ class FetchData:
         # self.chg = np.zeros((self.layer, self.totalChannel, WINDOW_SIZE))
         self.index = 0
         self.action = np.zeros((SUPPORTED_ACTION_NUM))
-        self.energy_metrix = np.zeros((SUPPORTED_ACTION_NUM, self.r, self.c))
+        self.energy_metrix = np.zeros((self.r, self.c))
+
         self.position = np.zeros((SUPPORTED_ACTION_NUM))  # the current poition(X*self.r+Y) of object(index)
         self.unknownPositionEnergy = np.zeros((self.r * self.c))
         self.move = np.zeros((SUPPORTED_ACTION_NUM))  # if the position stays unchanged, move = false, else true
@@ -201,7 +202,7 @@ class FetchData:
     '''
     def fetch_ch_data(self):
 
-        self.timingTrack()  # tracking the position history of object
+        #self.timingTrack()  # tracking the position history of object
 
         # self.base = np.zeros((self.totalChannel, WINDOW_SIZE))
         self.test = [0] * WINDOW_SIZE
@@ -227,10 +228,15 @@ class FetchData:
             for k in range(self.layer):
                 processed_data = np.array([self.processData(self.data[k][i]) for i in range(self.totalChannel)])
                 processed_base = np.array([self.processData(self.base[k][i]) for i in range(self.totalChannel)])
-                energy_metrix = processed_base - processed_data  # 1*64
+                self.energy_metrix = processed_base - processed_data  # 1*64,energy at the moment
+                # for i in self.energy_metrix:
+                #     print("Energy_metix: {}".format(self.energy_metrix))
+                self.drawShape()
                 realtime_base = np.mean(processed_base)
                 realtime_data = np.mean(processed_data)  # !!! DECREASE when non-conductive
                 real_time_energy = - (realtime_data - realtime_base)
+                # print("Real time energy: {}".format(real_time_energy))
+
                 # print("real_time_energy = " + str(t_data) + '-' + str(t_base) + '=' + str(real_time_energy))    # always under
 
                 # if realtime_data - self.last_down_data > OBJECT_ENERGY_THRESHOLD:
@@ -322,49 +328,62 @@ class FetchData:
     :param: object_seq refers to index of object in elf.energy_metrix[SUPPORTED_ACTION_NUM][][]
     :returns: coordinate refers to x_coordinate * 16 + y；center_energy
     '''
-    def drawShape(self, object_seq):
+    def drawShape(self):
         canvas = np.ones((CANVAS_WIDTH, CANVAS_WIDTH, 3),
                          dtype="uint8")  # Initialize a blank canvas, set it's size, channel, bg=white
         canvas *= 255
         points = np.zeros(MAX_DRAW_POINT * 2, np.int32)  # each point has 2 values: x and y.
-        count = 0  # number of processed points
+
         # To get max energy
         max_energy = 0
         single_point_energy = []
         # Get max energy for the object
         for i in range(self.r):
             for j in range(self.c):
-                if self.energy_metrix[object_seq][i][j] > max_energy:
-                    max_energy = self.energy_metrix[object_seq][i][j]
+                # print("Type of self.energy: {}".format(type(self.energy_metrix)))
+                #print("self.energy_metrix[0]= {}".format(i,j,self.energy_metrix.item(0)))
+                temp = self.energy_metrix[i * self.r + j]
+                if temp > max_energy:
+                    max_energy = temp
                     area_threshold = AREA_PERCENT * max_energy
-
+        count = 0  # number of processed points
         # Produce a selection of points to draw soon
         for i in range(self.r):
             for j in range(self.c):
                 # Draw the point on canvas only when it's close to max_energy, thus noise is away.
-                if self.energy_metrix[object_seq][i][j] > 0 and self.energy_metrix[object_seq][i][j] > area_threshold:
+                temp = self.energy_metrix[i * self.r + j]
+                if temp > 0 and temp > area_threshold:
                     points[count] = int(i) * 50
+                    # print("Points[{}] = {}".format(count,points[count]))
                     count += 1
                     points[count] = int(j) * 50
                     count += 1
-                    single_point_energy.append(self.energy_metrix[object_seq][i][j])
+                    single_point_energy.append(temp)
 
-        point_set = points[0:count]  # remove extra empty points
+        if count == 0:  # No signal at the moment
+            print("No point generated.")
+            return 0
+
+
+        point_set = points[0: count]     # remove extra empty points
         point_shaped = point_set.reshape(-1, (count + 1) // 2,
                                          2)  # reshape it to Object_number * (x,y); RESHAPE TO N*1*2
         # print("points after reshape")
         # print(point_shaped)
         '''
-        pts : 点集数组
-        isClosed: 多边形是否闭合
-        color: 颜色
-        thickness: 线条宽度
+        pts : Set of points
+        isClosed: polygon is closed or not
+        color: red
+        thickness: width of the line
         '''
         cv2.polylines(canvas, pts=[point_shaped], isClosed=True, color=(0, 0, 255), thickness=1)
+
+        # Back to original position data
+        for i in range(0, len(point_set)):
+            point_set[i] /= 50
+        #print("Point_set: {}".format(point_set))
         # Calculate position and energy for capacity_center
         energy_sum = 0
-        x_coordinate_sum = 0
-        y_coordinate_sum = 0
         x_coordinate_energy_sum = 0
         y_coordinate_energy_sum = 0
         for i in range(0, count, 2):
@@ -377,10 +396,13 @@ class FetchData:
 
         cv2.imshow("polylines", canvas)
         cv2.imwrite("polylines.png", canvas)
-        cv2.waitKey(0)
-        print('x_center is {}, y_center is {}, center_energy is {}'.format(x_center, y_center, center_energy))
-        coordinate = x_center * self.r + y_center
-        return coordinate, center_energy
+        #cv2.waitKey(0)
+        #print('x_center is {}, y_center is {}, center_energy is {}'.format(x_center, y_center, center_energy))
+        coordinate = int(x_center * self.r + y_center)
+        self.unknownPositionEnergy[coordinate] = center_energy
+        #print("unknownposition: ")
+        #print(self.unknownPositionEnergy)
+
 
     # every thread, check and record the position history of every object(from indexMin to indexMax)
     def timingTrack(self):
