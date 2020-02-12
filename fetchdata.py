@@ -90,10 +90,11 @@ class FetchData:
         self.action = np.zeros((SUPPORTED_ACTION_NUM))
         self.energy_metrix = np.zeros((SUPPORTED_ACTION_NUM, self.r, self.c))
         self.position = np.zeros((SUPPORTED_ACTION_NUM))  # the current poition(X*self.r+Y) of object(index)
+        self.unknownPositionEnergy = np.zeros((self.r*self.c))
         self.move = np.zeros((SUPPORTED_ACTION_NUM))  # if the position stays unchanged, move = false, else true
-        self.track = np.zeros((SUPPORTED_ACTION_NUM))  # the position history of object(index)
+        self.track = np.array(self.position, dtype=np.str)  # the position history of object(index)
         self.tempIndex = 0
-        # (太难解释了，用了下中文:> )循环中的i不是self对象的类变量，不能作为getCurrentPosition()函数的参数，所以建立用来临时传参的变量self.tempIndex表示目前遍历到的物体的索引值以返回这个物体的currentPosition
+        # (用了下中文:> )循环中的i不是self对象的类变量，不能作为getCurrentPosition()函数的参数，所以建立用来临时传参的变量self.tempIndex表示目前遍历到的物体的索引值以返回这个物体的currentPosition
 
         self.lastData = np.zeros((self.layer, self.totalChannel, WINDOW_SIZE))
         self.objectEnergy = np.zeros((SUPPORTED_ACTION_NUM, self.layer, self.totalChannel))
@@ -103,7 +104,7 @@ class FetchData:
         self.arduino_port = serial.Serial(port=ARDUINO_SERIAL_PORT, baudrate=250000)
         self.arduino_port.reset_input_buffer()
         # time.sleep(1)
-        self.start_object_recog = False;
+        self.start_object_recog = False
         self.arduino_port.dsrdtr = 0
         # time.sleep(1)
         self.reset()
@@ -349,19 +350,25 @@ class FetchData:
     # every thread, check and record the position history of every object(from indexMin to indexMax)
     def timingTrack(self):
         # print("start tracking object")
+        self.position = [1,2,3,4,5]                                            ########################## debug
         for i in range(self.index):
             self.tempIndex = i
-            print(i)
+            self.track[i] = str(self.track[i]) + ' ' + str(self.position[i]) + ' ' ###################################### debug
+            print(self.track[i])                                                 ################################# debug
             if self.action[i] == 1:  # object(index) is down
-                if self.getCurrentPosition() == self.position[i]:
+                if self.getCurrentPosition() != self.position[i]:
+                    self.move[i] = True  # position of the object(index) changed
+                    self.position[i] = self.getCurrentPosition()
+                    self.track[i] = str(self.track[i]) + " " + str(self.position[i]) + " "
+                else:
                     print("object[" + str(i) + "] position unchanged")
                     self.move[i] = False  # position of the object(index) stay unchanged
-                else:
-                    self.move[i] = True  # position of the object(index) changed
-                    self.track[i] = self.track[i] + ' ' + str(self.position[i]) + ' '
 
     def getCurrentPosition(self):
-        return self.position[self.tempIndex]
+        for j in range(self.r*self.c):
+            if np.mean(self.objectEnergy[self.tempIndex][0]) == self.unknownPositionEnergy[j]: ##########################别忘了改成阈值！
+                return j
+
 
     def processData(self, data):
 
@@ -607,5 +614,6 @@ class FetchData:
 if __name__ == '__main__':
     (serialRead())
     # MSPComm("/dev/cu.usbmodem14141", "Test")
+
     fetchdata = FetchData()
     fetchdata.start()
