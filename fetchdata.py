@@ -47,7 +47,7 @@ SINGLE_CAP_THRESHOLD = 50000
 ARDUINO_SERIAL_PORT = "COM4"
 CHANELL = 4
 SUPPORTED_ACTION_NUM = 100
-ACTION_ENERGY_THRESHOLD = 15000
+ACTION_ENERGY_THRESHOLD = 20000
 OBJECT_ENERGY_THRESHOLD = 1000
 MAX_DRAW_POINT = 256
 AREA_PERCENT = 0.7
@@ -232,6 +232,7 @@ class FetchData:
                 # for i in self.energy_metrix:
                 #     print("Energy_metix: {}".format(self.energy_metrix))
                 self.drawShape()
+                self.timingTrack()
                 realtime_base = np.mean(processed_base)
                 realtime_data = np.mean(processed_data)  # !!! DECREASE when non-conductive
                 real_time_energy = - (realtime_data - realtime_base)
@@ -265,6 +266,7 @@ class FetchData:
 
                     print("ACTION DOWN INDEX " + str(self.index) + ' energy ' + str(real_time_energy))
                     # self.calPosition()
+                    self.track[self.index] = "track object[" + str(self.index) + "]:"
                     self.index += 1
                     self.last_down_data = realtime_data
                     '''
@@ -291,7 +293,7 @@ class FetchData:
                             # print("energy of object  "+str(i)+" is  " + str(object_energy))
                             # print('real_time_energy - object_energy = ' + str(real_time_energy)  + ' - ' + str(object_energy) + '=' + str(object_energy - real_time_energy))
                             if abs(abs(realtime_data - self.last_down_data) - abs(object_energy)) < abs(
-                                    object_energy) * 1.5:  # OBJECT_ENERGY_THRESHOLD: # True when things REALLY go UP
+                                    object_energy) * 3:  # OBJECT_ENERGY_THRESHOLD: # True when things REALLY go UP
                                 self.action[i] = 0
                                 # self.index += 1
                                 self.base[k] = copy.deepcopy(self.data[k])
@@ -407,26 +409,26 @@ class FetchData:
     # every thread, check and record the position history of every object(from indexMin to indexMax)
     def timingTrack(self):
         # print("start tracking object")
-        self.position = [1, 2, 3, 4, 5]  ########################## debug
         for i in range(self.index):
-            self.tempIndex = i
-            self.track[i] = str(self.track[i]) + ' ' + str(
-                self.position[i]) + ' '  ###################################### debug
-            print(self.track[i])  ################################# debug
+            # self.tempIndex = i
             if self.action[i] == 1:  # object(index) is down
-                if self.getCurrentPosition() != self.position[i]:
-                    self.move[i] = True  # position of the object(index) changed
-                    self.position[i] = self.getCurrentPosition()
-                    self.track[i] = str(self.track[i]) + " " + str(self.position[i]) + " "
-                else:
-                    print("object[" + str(i) + "] position unchanged")
-                    self.move[i] = False  # position of the object(index) stay unchanged
+                if self.getCurrentPosition(i) != self.position[i]:
+                    # print("object[" + str(i) + "] position unchanged")
+                    # self.move[i] = False  # position of the object(index) stay unchanged
+                # else:
+                    # self.move[i] = True  # position of the object(index) changed
+                    self.position[i] = self.getCurrentPosition(i)
+                    self.track[i] = self.track[i] + " " + str(self.position[i])
+            if self.action[i]:
+                print(self.track[i])
 
-    def getCurrentPosition(self):
+    def getCurrentPosition(self, index):
         for j in range(self.r * self.c):
-            if np.mean(self.objectEnergy[self.tempIndex][0]) == self.unknownPositionEnergy[
-                j]:  ##########################别忘了改成阈值！
+            if 0.5*np.mean(self.objectEnergy[index][0]) < self.unknownPositionEnergy[j] < 2*np.mean(self.objectEnergy[index][0]):  ##########################别忘了改成阈值！
+                print("unknownPositionEnergy[x*16+y="+str(j)+"]="+str(self.unknownPositionEnergy[j]))
                 return j
+            else:
+                return 200
 
     def processData(self, data):
 
