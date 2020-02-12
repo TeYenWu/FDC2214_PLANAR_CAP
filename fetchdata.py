@@ -49,14 +49,13 @@ CHANELL = 4
 SUPPORTED_ACTION_NUM = 100
 ACTION_ENERGY_THRESHOLD = 20000
 OBJECT_ENERGY_THRESHOLD = 1000
-MAX_DRAW_POINT = 256
+MAX_DRAW_POINT = 256    # self.c * self.r
 AREA_PERCENT = 0.7
 CANVAS_WIDTH = 800
 CANVAS_HEIGHT = 800
 
 
 # categorization
-
 def serialRead():
     # detect serial port.
     serialDict = []
@@ -73,10 +72,6 @@ def serialRead():
 
 
 class FetchData:
-    '''
-    Function: Build by set FDC and start sensor
-    '''
-
     def __init__(self):
         # second
         self.mysocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -88,9 +83,7 @@ class FetchData:
         self.layer = 1
         self.recalibration = False
         self.calibration = True
-
         self.totalChannel = self.r * self.c
-
         self.data = np.zeros((self.layer, self.totalChannel, WINDOW_SIZE))
         self.base = np.zeros((self.layer, self.totalChannel, WINDOW_SIZE))
         # self.cur = np.zeros((self.layer, self.totalChannel, WINDOW_SIZE))
@@ -143,12 +136,12 @@ class FetchData:
     def calculateEnergy(self, values):
         return -(np.mean(values))
 
-    '''
-    Process values and then send them all out by send()
-    Read diffs[][], calculate and get ch[].
-    '''
 
     def sender(self):
+        """Process values and then send them all to processing-program.
+
+        Read diffs[][], calculate and get ch[].
+        """
         while 1:
             self.fetch_ch_data()
             ch = []
@@ -195,13 +188,10 @@ class FetchData:
         # self.conn.send(' '.join(str(e) for e in rawch) + '\n')
         # time.sleep(self.send_time)
 
-    '''
-    Read signal from arduino_port 
-    Calibrate them by substracting base
-    So we get diffs[][]
-    '''
-    def fetch_ch_data(self):
 
+    def fetch_ch_data(self):
+        """Read signal from arduino_port, Calibrate them by substracting base. So we get diffs[][]
+        """
         #self.timingTrack()  # tracking the position history of object
 
         # self.base = np.zeros((self.totalChannel, WINDOW_SIZE))
@@ -325,12 +315,12 @@ class FetchData:
 
         # print("record took " + str(time.time() - start_time) + "s")
 
-    '''
-    Function: For each object in self.energy_metrix, drawShape(object_seq) calculates its equivalent position point and energy
-    :param: object_seq refers to index of object in elf.energy_metrix[SUPPORTED_ACTION_NUM][][]
-    :returns: coordinate refers to x_coordinate * 16 + y；center_energy
-    '''
+
     def drawShape(self):
+        """For each object, draw its Shape, calculates its equivalent position point and energy.
+
+        :returns: coordinate refers to x_coordinate * 16 + y；center_energy
+        """
         canvas = np.ones((CANVAS_WIDTH, CANVAS_WIDTH, 3),
                          dtype="uint8")  # Initialize a blank canvas, set it's size, channel, bg=white
         canvas *= 255
@@ -372,7 +362,7 @@ class FetchData:
                                          2)  # reshape it to Object_number * (x,y); RESHAPE TO N*1*2
         # print("points after reshape")
         # print(point_shaped)
-        '''
+        '''About params for polylines
         pts : Set of points
         isClosed: polygon is closed or not
         color: red
@@ -450,10 +440,10 @@ class FetchData:
                 elif diff > 0 and abs(diff) > self.capDecreasePeak[k][i] and not self.recalibration:
                     self.capDecreasePeak[k][i] = abs(diff)
 
-    '''
-    get current signal
-    '''
+
     def getCurrent(self):
+        """Gets current signal.
+        """
         for k in range(self.layer):
             for i in range(self.totalChannel):
                 processed_data = self.processData(self.data[k][i])
@@ -475,11 +465,10 @@ class FetchData:
                 print(diff)
         # now we get current signal of the whole map after changing
 
-    '''
-    Adjust diffs[][]
-    '''
 
     def calDiff(self):
+        """Calculate diffs[][]
+        """
         for k in range(self.layer):
             for i in range(self.totalChannel):
                 processed_data = self.processData(self.data[k][i])
@@ -529,11 +518,10 @@ class FetchData:
             for i in range(self.totalChannel):
                 self.diffs[k][i] = self.diffs[k][i] / self.conductivePeak[k][i]
 
-    '''
-    Subtract abs(minimum) in column and raw for diffs[]
-    '''
 
     def cancelSingleCap2(self):
+        """Subtract abs(minimum) in column and raw for diffs[]
+        """
         candidates = []
         rate = 0.7
         for k in range(self.layer):
@@ -565,7 +553,6 @@ class FetchData:
                     # self.diffs[k][index] = 0
 
     def cancelSingleCap(self):
-
         candidates = []
         for k in range(self.layer):
             for i in range(self.r):
@@ -637,11 +624,9 @@ class FetchData:
         self.capDecreasePeak = np.ones((self.layer, self.totalChannel)) * CAP_DECREASE_PEAK
         self.arduino_port.write("reset\n".encode())
         self.diffs = np.zeros((self.layer, self.totalChannel))
-
         # self.pre_deformed_data = np.ones((self.layer, self.totalChannel))
 
     def start(self):
-
         # plt.ion()
         # fig = plt.figure()
 
@@ -678,4 +663,3 @@ if __name__ == '__main__':
     # MSPComm("/dev/cu.usbmodem14141", "Test")
     fetchdata = FetchData()
     fetchdata.start()
-

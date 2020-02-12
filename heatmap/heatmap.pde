@@ -152,7 +152,7 @@ void fillHeatMap(){
             if(interp_array[y][x]<0){
              interp_values[y*width+x+k*heatMapGap] = int(-interp_array[y][x]*255);
               c = getGrayGradientColor(interp_array[y][x], max_negative);
-            } else if(interp_array[y][x]>0.01){
+            } else if(interp_array[y][x]>0.05){
               c = getGradientColor(interp_array[y][x], max_positive);            
             }
             pixels[y*width+x+k*heatMapGap] = c;
