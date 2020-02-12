@@ -13,6 +13,7 @@ import numpy as np
 import matplotlib
 
 import matplotlib.pyplot as plt
+
 # import matplotlib.font_manager as fm
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
@@ -22,6 +23,7 @@ import math
 import numpy as np
 import os
 import copy
+import cv2
 
 from sklearn.neighbors import NearestNeighbors
 # import feature_extraction8
@@ -47,6 +49,11 @@ CHANELL = 4
 SUPPORTED_ACTION_NUM = 100
 ACTION_ENERGY_THRESHOLD = 15000
 OBJECT_ENERGY_THRESHOLD = 1000
+MAX_DRAW_POINT = 20
+AREA_PERCENT = 0.7
+CANVAS_WIDTH = 800
+CANVAS_HEIGHT = 400
+
 
 # categorization
 
@@ -64,10 +71,12 @@ def serialRead():
             serialNum += 1
     return serialNum, serialDict
 
+
 class FetchData:
     '''
     Function: Build by set FDC and start sensor
     '''
+
     def __init__(self):
         # second
         self.mysocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -90,7 +99,7 @@ class FetchData:
         self.action = np.zeros((SUPPORTED_ACTION_NUM))
         self.energy_metrix = np.zeros((SUPPORTED_ACTION_NUM, self.r, self.c))
         self.position = np.zeros((SUPPORTED_ACTION_NUM))  # the current poition(X*self.r+Y) of object(index)
-        self.unknownPositionEnergy = np.zeros((self.r*self.c))
+        self.unknownPositionEnergy = np.zeros((self.r * self.c))
         self.move = np.zeros((SUPPORTED_ACTION_NUM))  # if the position stays unchanged, move = false, else true
         self.track = np.array(self.position, dtype=np.str)  # the position history of object(index)
         self.tempIndex = 0
@@ -119,9 +128,9 @@ class FetchData:
                 if data:
                     d = data.decode("utf-8")
                     if d.strip() == "reset":
-                        #s_beforeC = data
+                        # s_beforeC = data
                         # self.getCurrent()   # fresh cur[k][i], to save data before changed
-                        self.reset()    # fresh base, to save new base
+                        self.reset()  # fresh base, to save new base
                         # self.getChanged()   # get actual signal after placing objects
                         self.start_object_recog = True
 
@@ -130,7 +139,6 @@ class FetchData:
                 if self.conn:
                     print('Connected by', addr)
 
-
     def calculateEnergy(self, values):
         return -(np.mean(values))
 
@@ -138,6 +146,7 @@ class FetchData:
     Process values and then send them all out by send()
     Read diffs[][], calculate and get ch[].
     '''
+
     def sender(self):
         while 1:
             self.fetch_ch_data()
@@ -149,9 +158,9 @@ class FetchData:
                     diff = self.diffs[k][i]
                     # print(i)
                     if diff < CONDUCTIVE_THRESHOLD:
-                        ch.append(diff/self.nonConductivePeak[k][i])
+                        ch.append(diff / self.nonConductivePeak[k][i])
                     else:
-                        ch.append((-diff/self.conductivePeak[k][i]))
+                        ch.append((-diff / self.conductivePeak[k][i]))
 
             ''' unlike ch(if diff[]>0 diff[]=0), zh is raw data - base
             zh = []
@@ -159,8 +168,8 @@ class FetchData:
                 zh.append(self.energy_metrix[self.index][i//8][i % 8])
             '''
 
-                # print (data[i]-base[i])
-                # rawch.append(data[i])
+            # print (data[i]-base[i])
+            # rawch.append(data[i])
             # for i in range(self.r * self.c):
             #     diff1 = self.processData(self.data[0][i]) - self.processData(self.base[0][i])
             #     diff2 = self.processData(self.data[1][i]) - self.processData(self.base[1][i])
@@ -180,17 +189,16 @@ class FetchData:
             # print("Low Peak: " + ' '.join(str(e) for e in self.nonConductivePeak) + '\n')
             # print("Upper Peak: " + ' '.join(str(e) for e in self.capDecreasePeak) + '\n')
             # print("Pre Deformed Data: " + ' '.join(str(e) for e in self.pre_deformed_data) + '\n')
-           # print("Value: " + ' '.join(str(e) for e in ch) + '\n')
-            # print("isConductive: " + ' '.join(str(e) for e in isConductive) +'\n')
-            # self.conn.send(' '.join(str(e) for e in rawch) + '\n')
-            # time.sleep(self.send_time)
+        # print("Value: " + ' '.join(str(e) for e in ch) + '\n')
+        # print("isConductive: " + ' '.join(str(e) for e in isConductive) +'\n')
+        # self.conn.send(' '.join(str(e) for e in rawch) + '\n')
+        # time.sleep(self.send_time)
 
     '''
     Read signal from arduino_port 
     Calibrate them by substracting base
     So we get diffs[][]
     '''
-
     def fetch_ch_data(self):
 
         self.timingTrack()  # tracking the position history of object
@@ -210,7 +218,7 @@ class FetchData:
                 for k in range(self.layer):
                     # fill in self.data from zero to arduino_port
                     self.data[k][i * self.c + j][:-1] = self.data[k][i * self.c + j][1:]
-#                    print("self.data " + str(self.data))  # no increase
+                    #                    print("self.data " + str(self.data))  # no increase
                     self.data[k][i * self.c + j][-1] = int(result_arr[i * self.c * self.layer + j * self.layer + k])
                     if self.calibration:
                         self.base[k][i * self.c + j] = copy.deepcopy(self.data[k][i * self.c + j])
@@ -219,14 +227,14 @@ class FetchData:
             for k in range(self.layer):
                 processed_data = np.array([self.processData(self.data[k][i]) for i in range(self.totalChannel)])
                 processed_base = np.array([self.processData(self.base[k][i]) for i in range(self.totalChannel)])
-                energy_metrix = processed_base - processed_data # 1*64
+                energy_metrix = processed_base - processed_data  # 1*64
                 realtime_base = np.mean(processed_base)
-                realtime_data = np.mean(processed_data)    # !!! DECREASE when non-conductive
+                realtime_data = np.mean(processed_data)  # !!! DECREASE when non-conductive
                 real_time_energy = - (realtime_data - realtime_base)
                 # print("real_time_energy = " + str(t_data) + '-' + str(t_base) + '=' + str(real_time_energy))    # always under
 
                 # if realtime_data - self.last_down_data > OBJECT_ENERGY_THRESHOLD:
-                    # print("realtime_data - self.last_down_data: " + str(realtime_data) + " - " + str(self.last_down_data) + " = " + str(realtime_data - self.last_down_data))
+                # print("realtime_data - self.last_down_data: " + str(realtime_data) + " - " + str(self.last_down_data) + " = " + str(realtime_data - self.last_down_data))
                 '''
                 if sth new is placed, then : 
                     1. add self.action[index], self.objectEnergy[index]
@@ -249,7 +257,7 @@ class FetchData:
                     # 3. update base, index, last_down_data
                     self.base[k] = copy.deepcopy(self.data[k])
 
-                    print("ACTION DOWN INDEX " + str(self.index) + ' energy '+str(real_time_energy))
+                    print("ACTION DOWN INDEX " + str(self.index) + ' energy ' + str(real_time_energy))
                     # self.calPosition()
                     self.index += 1
                     self.last_down_data = realtime_data
@@ -265,49 +273,9 @@ class FetchData:
                             #print(self.energy_metrix[self.index-1][i // self.r][i % self.c], end = ' ')
                     '''
 
-                    '''
-                    fig = plt.figure()
-                    ax = Axes3D(fig)
-                    X = np.arange(0, 7, 0.1)
-                    Y = np.arange(0, 7, 0.1)
-                    # X, Y = np.meshgrid(X, Y)
-                    Z = np.zeros((len(X), len(Y)))
-                    for a in range(8):
-                        for b in range(8):
-                            #print("Z[a, b] = self.energy_metrix[self.index][a][b]: " + str(self.energy_metrix[self.index][a][b]))
-                            Z[a, b] = self.energy_metrix[self.index][a][b]
-
-                    ax.plot_surface(X, Y, Z, rstride=1, cstride=1, cmap='rainbow')
-                    plt.show()
-                    
-                    
-                    # 1. 创建图(绘制环境)
-                    figure = plt.figure('3D图形', figsize=(8, 8))
-
-                    # 2. 创建3D坐标系（直接创建，使用Figure中的函数创建：这里使用函数）
-                    ax = figure.add_axes([0, 0, 0, 100], projection='3d')
-
-                    # 使用线条绘制马鞍面
-                    x, y = np.mgrid[0:7:8j, 0:7:8j]
-                    print("Type of x:")
-                    print(type(x))
-                    #z = self.energy_metrix[self.index][x][y] # ???
-                    z_t = []
-                    for i in range(self.r * self.c):
-                        z_t.append(self.energy_metrix[self.index][i//8][i%8])
-                    z = np.array(z_t)
-
-                    colors = plt.cm.get_cmap('cool')
-                    ax.scatter(x.flat, y.flat, z.flat, label='3D点', s=1, c=z.flat, cmap=colors)
-
-                    ax.grid(b=False)  # 网格线
-
-                    plt.show()
-                    '''
-
                 elif ((realtime_data - self.last_down_data) - self.min_energy) > 0:  # True when object UP
-                    #print("min_energy: "+str(min_energy))
-                    #print("signal decreasing")
+                    # print("min_energy: "+str(min_energy))
+                    # print("signal decreasing")
                     for i in range(self.index):
                         # print("action["+str(i)+"]" + str(self.action[i]))
                         if self.action[i] == 1:
@@ -316,7 +284,8 @@ class FetchData:
                             object_energy = np.mean(self.objectEnergy[i][k])  # energy of object i
                             # print("energy of object  "+str(i)+" is  " + str(object_energy))
                             # print('real_time_energy - object_energy = ' + str(real_time_energy)  + ' - ' + str(object_energy) + '=' + str(object_energy - real_time_energy))
-                            if abs(abs(realtime_data - self.last_down_data) - abs(object_energy)) < abs(object_energy) * 1.5:    # OBJECT_ENERGY_THRESHOLD: # True when things REALLY go UP
+                            if abs(abs(realtime_data - self.last_down_data) - abs(object_energy)) < abs(
+                                    object_energy) * 1.5:  # OBJECT_ENERGY_THRESHOLD: # True when things REALLY go UP
                                 self.action[i] = 0
                                 # self.index += 1
                                 self.base[k] = copy.deepcopy(self.data[k])
@@ -327,7 +296,7 @@ class FetchData:
             #     before_data = self.cur[k][i]
             #     changed_data = self.chg[k][i]
             #     self.objectEnergy[self.index][k][i] = changed_data - before_data
-                # bias[index][k][i] = 0
+            # bias[index][k][i] = 0
         # print("Bias: ")
         # print(self.objectEnergy[self.index])
 
@@ -345,16 +314,83 @@ class FetchData:
             self.calibration = True
             self.recalibration = False
         # time.sleep(0.01)
-#        print("record took " + str(time.time() - start_time) + "s")
+
+        # print("record took " + str(time.time() - start_time) + "s")
+
+    '''
+    Function: For each object in self.energy_metrix, drawShape(object_seq) calculates its equivalent position point and energy
+    :param: object_seq refers to index of object in elf.energy_metrix[SUPPORTED_ACTION_NUM][][]
+    :returns: coordinate refers to x_coordinate * 16 + y；center_energy
+    '''
+    def drawShape(self, object_seq):
+        canvas = np.ones((CANVAS_WIDTH, CANVAS_WIDTH, 3),
+                         dtype="uint8")  # Initialize a blank canvas, set it's size, channel, bg=white
+        canvas *= 255
+        points = np.zeros(MAX_DRAW_POINT * 2, np.int32)  # each point has 2 values: x and y.
+        count = 0  # number of processed points
+        # To get max energy
+        max_energy = 0
+        single_point_energy = []
+        # Get max energy for the object
+        for i in range(self.r):
+            for j in range(self.c):
+                if self.energy_metrix[object_seq][i][j] > max_energy:
+                    max_energy = self.energy_metrix[object_seq][i][j]
+                    area_threshold = AREA_PERCENT * max_energy
+
+        # Produce a selection of points to draw soon
+        for i in range(self.r):
+            for j in range(self.c):
+                # Draw the point on canvas only when it's close to max_energy, thus noise is away.
+                if self.energy_metrix[object_seq][i][j] > 0 and self.energy_metrix[object_seq][i][j] > area_threshold:
+                    points[count] = int(i) * 50
+                    count += 1
+                    points[count] = int(j) * 50
+                    count += 1
+                    single_point_energy.append(self.energy_metrix[object_seq][i][j])
+
+        point_set = points[0:count]  # remove extra empty points
+        point_shaped = point_set.reshape(-1, (count + 1) // 2,
+                                         2)  # reshape it to Object_number * (x,y); RESHAPE TO N*1*2
+        # print("points after reshape")
+        # print(point_shaped)
+        '''
+        pts : 点集数组
+        isClosed: 多边形是否闭合
+        color: 颜色
+        thickness: 线条宽度
+        '''
+        cv2.polylines(canvas, pts=[point_shaped], isClosed=True, color=(0, 0, 255), thickness=1)
+        # Calculate position and energy for capacity_center
+        energy_sum = 0
+        x_coordinate_sum = 0
+        y_coordinate_sum = 0
+        x_coordinate_energy_sum = 0
+        y_coordinate_energy_sum = 0
+        for i in range(0, count, 2):
+            energy_sum += single_point_energy[i // 2]  # energy of the whole area
+            x_coordinate_energy_sum += point_set[i] * single_point_energy[i // 2]
+            y_coordinate_energy_sum += point_set[i + 1] * single_point_energy[i // 2]
+        x_center = x_coordinate_energy_sum / energy_sum
+        y_center = y_coordinate_energy_sum / energy_sum
+        center_energy = energy_sum / (count // 2)
+
+        cv2.imshow("polylines", canvas)
+        cv2.imwrite("polylines.png", canvas)
+        cv2.waitKey(0)
+        print('x_center is {}, y_center is {}, center_energy is {}'.format(x_center, y_center, center_energy))
+        coordinate = x_center * self.r + y_center
+        return coordinate, center_energy
 
     # every thread, check and record the position history of every object(from indexMin to indexMax)
     def timingTrack(self):
         # print("start tracking object")
-        self.position = [1,2,3,4,5]                                            ########################## debug
+        self.position = [1, 2, 3, 4, 5]  ########################## debug
         for i in range(self.index):
             self.tempIndex = i
-            self.track[i] = str(self.track[i]) + ' ' + str(self.position[i]) + ' ' ###################################### debug
-            print(self.track[i])                                                 ################################# debug
+            self.track[i] = str(self.track[i]) + ' ' + str(
+                self.position[i]) + ' '  ###################################### debug
+            print(self.track[i])  ################################# debug
             if self.action[i] == 1:  # object(index) is down
                 if self.getCurrentPosition() != self.position[i]:
                     self.move[i] = True  # position of the object(index) changed
@@ -365,10 +401,10 @@ class FetchData:
                     self.move[i] = False  # position of the object(index) stay unchanged
 
     def getCurrentPosition(self):
-        for j in range(self.r*self.c):
-            if np.mean(self.objectEnergy[self.tempIndex][0]) == self.unknownPositionEnergy[j]: ##########################别忘了改成阈值！
+        for j in range(self.r * self.c):
+            if np.mean(self.objectEnergy[self.tempIndex][0]) == self.unknownPositionEnergy[
+                j]:  ##########################别忘了改成阈值！
                 return j
-
 
     def processData(self, data):
 
@@ -389,10 +425,10 @@ class FetchData:
                             self.conductivePeak[k][i] = abs(diff)
                 elif diff > 0 and abs(diff) > self.capDecreasePeak[k][i] and not self.recalibration:
                     self.capDecreasePeak[k][i] = abs(diff)
+
     '''
     get current signal
     '''
-
     def getCurrent(self):
         for k in range(self.layer):
             for i in range(self.totalChannel):
@@ -418,19 +454,20 @@ class FetchData:
     '''
     Adjust diffs[][]
     '''
+
     def calDiff(self):
         for k in range(self.layer):
             for i in range(self.totalChannel):
                 processed_data = self.processData(self.data[k][i])
                 processed_base = self.processData(self.base[k][i])
                 diff = processed_data - processed_base
-                if(diff > 0):
+                if (diff > 0):
                     # self.base[k][i] = [processed_base]*WINDOW_SIZE
                     diff = 0
                 else:
                     diff = abs(diff)
-#                print("diff")
-#                print(diff)
+                #                print("diff")
+                #                print(diff)
                 self.diffs[k][i] = diff
 
     def calPosition(self):
@@ -449,7 +486,7 @@ class FetchData:
     def recgMaterial(self):
         # To get diffs[][]
         max_metrix = max(max((self.diffs)))
-#        print("Max of the metrix is ", max_metrix)
+        #        print("Max of the metrix is ", max_metrix)
         useful_points = []
         cover_rate = 0.9
         for k in range(self.layer):
@@ -460,7 +497,8 @@ class FetchData:
                     if (t > max_metrix * cover_rate):
                         useful_points.append(t)
         avr = np.mean(useful_points)  # avr
-#        print("Average of this type is ", avr)
+
+    #        print("Average of this type is ", avr)
 
     def scaleDiff(self):
         for k in range(self.layer):
@@ -484,7 +522,7 @@ class FetchData:
                     index = i * self.c + j
                     # if(self.diffs[k][index]) < maximum * rate :
                     self.diffs[k][index] = ((self.diffs[k][index]) - minimum)
-                        # self.diffs[k][index] = 0
+                    # self.diffs[k][index] = 0
 
             for j in range(self.c):
                 col_caps = [(self.diffs[k][i * self.c + j]) for i in range(self.r)]
@@ -500,7 +538,7 @@ class FetchData:
                     index = i * self.c + j
                     # if (self.diffs[k][index]) < maximum * rate:
                     self.diffs[k][index] = ((self.diffs[k][index]) - minimum)
-                        # self.diffs[k][index] = 0
+                    # self.diffs[k][index] = 0
 
     def cancelSingleCap(self):
 
@@ -612,8 +650,8 @@ class FetchData:
 
 
 if __name__ == '__main__':
-    (serialRead())
+    serialRead()
     # MSPComm("/dev/cu.usbmodem14141", "Test")
-
     fetchdata = FetchData()
     fetchdata.start()
+
