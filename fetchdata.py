@@ -94,7 +94,7 @@ class FetchData:
 
         self.position = np.zeros((SUPPORTED_ACTION_NUM))  # the current poition(X*self.r+Y) of object(index)
         self.unknownPositionEnergy = np.zeros((self.r * self.c))
-        self.move = np.zeros((SUPPORTED_ACTION_NUM))  # if the position stays unchanged, move = false, else true
+        # self.move = np.zeros((SUPPORTED_ACTION_NUM))  # if the position stays unchanged, move = false, else true
         self.track = np.array(self.position, dtype=np.str)  # the position history of object(index)
         self.tempIndex = 0
         # (用了下中文:> )循环中的i不是self对象的类变量，不能作为getCurrentPosition()函数的参数，所以建立用来临时传参的变量self.tempIndex表示目前遍历到的物体的索引值以返回这个物体的currentPosition
@@ -433,7 +433,7 @@ class FetchData:
                 # else:
                     # self.move[i] = True  # position of the object(index) changed
                     self.position[i] = self.getCurrentPosition(i)
-                    self.track[i] = self.track[i] + " " + str(self.position[i])
+                    self.track[i] = self.track[i] + "  " + str(int(self.position[i]//self.r))+","+str(int(self.position[i]%self.c))  # str(self.position[i])
             if self.action[i]:
                 print(self.track[i])
 
