@@ -415,11 +415,11 @@ class FetchData:
 
     def getCurrentPosition(self, index):
         for j in range(self.r * self.c):
-            if 0.5*np.mean(self.objectEnergy[index][0]) < self.unknownPositionEnergy[j] < 2*np.mean(self.objectEnergy[index][0]):  ##########################别忘了改成阈值！
+            # print("unknownPositionEnergy[x*16+y=" + str(j) + "]=" + str(self.unknownPositionEnergy[j]))
+            if 0.3*np.mean(self.objectEnergy[index][0]) < self.unknownPositionEnergy[j] < 3*np.mean(self.objectEnergy[index][0]):  ##########################别忘了改成阈值！
                 print("unknownPositionEnergy[x*16+y="+str(j)+"]="+str(self.unknownPositionEnergy[j]))
                 return j
-            else:
-                return 200
+        # return 200
 
     def processData(self, data):
 
