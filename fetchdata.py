@@ -295,7 +295,7 @@ class FetchData:
                             # print("energy of object  "+str(i)+" is  " + str(object_energy))
                             # print('real_time_energy - object_energy = ' + str(real_time_energy)  + ' - ' + str(object_energy) + '=' + str(object_energy - real_time_energy))
                             # OBJECT_ENERGY_THRESHOLD: # True when things REALLY go UP
-                            if abs(abs(realtime_data - self.last_down_data) - abs(object_energy)) < abs(object_energy) * 3:
+                            if abs(abs(realtime_data - self.last_down_data) - abs(object_energy)) < abs(object_energy) * 2:
                                 self.action[i] = 0
                                 # self.index += 1
                                 self.base[k] = copy.deepcopy(self.data[k])
