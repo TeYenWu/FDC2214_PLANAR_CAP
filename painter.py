@@ -97,16 +97,13 @@ def polyfill(object_point_list):
     image = np.ones([160, 160])
     plt.xlim(0, 160)  # x_coordinate ranges from 0 to 16
     plt.ylim(160, 0)
-
-
-
     # object1 = [150, 10, 0, 10, 10, 0]
     poly = []
     for i in range(0, len(object_point_list), 2):
         poly.append([object_point_list[i], object_point_list[i+1]])
-    print("poly: {}.".format(poly))
+    # print("poly: {}.".format(poly))
 
-    PoliFill(image, poly, False)
-    plt.imshow(image, plt.cm.magma)  # display a 2D image in magma(color mode)
-    plt.show()
+    #PoliFill(image, poly, False)
+    #plt.imshow(image, plt.cm.magma)  # display a 2D image in magma(color mode)
+    #plt.show()
 

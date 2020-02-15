@@ -40,7 +40,7 @@ SINGLE_CAP_THRESHOLD = 50000
 ARDUINO_SERIAL_PORT = "COM4"
 CHANELL = 4
 SUPPORTED_ACTION_NUM = 100
-ACTION_ENERGY_THRESHOLD = 9000
+ACTION_ENERGY_THRESHOLD = 10000
 OBJECT_ENERGY_THRESHOLD = 1000
 MAX_DRAW_POINT = 256    # self.c * self.r
 AREA_PERCENT = 0.8
@@ -207,7 +207,7 @@ class FetchData:
                     self.data[k][i * self.c + j][-1] = int(result_arr[i * self.c * self.layer + j * self.layer + k])
                     if self.calibration:
                         self.base[k][i * self.c + j] = copy.deepcopy(self.data[k][i * self.c + j])
-                        # self.action[self.index] = 1
+
         if self.start_object_recog:
             for k in range(self.layer):
                 processed_data = np.array([self.processData(self.data[k][i]) for i in range(self.totalChannel)])
@@ -222,43 +222,33 @@ class FetchData:
                 # print("Current_mv_pos: {}".format(cur_mv_pos))
 
                 self.unknownPositionEnergy[cur_mv_pos] = self.mv_energy
+                cur_obj_energy = self.mv_energy
                 # print("unknownposition: ")
                 # print(self.unknownPositionEnergy)
 
                 #self.timingTrack()
                 realtime_base = np.mean(processed_base)
-                realtime_data = np.mean(processed_data)  # !!! DECREASE when non-conductive
-                real_time_energy = - (realtime_data - realtime_base)
-                #if real_time_energy > ACTION_ENERGY_THRESHOLD:
-                if real_time_energy > 0:
-                    print("Real time energy: {}".format(real_time_energy))
-                # print("real_time_energy = " + str(t_data) + '-' + str(t_base) + '=' + str(real_time_energy))    # always under
-                # if realtime_data - self.last_down_data > OBJECT_ENERGY_THRESHOLD:
-                # print("realtime_data - self.last_down_data: " + str(realtime_data) + " - " + str(self.last_down_data) + " = " + str(realtime_data - self.last_down_data))
-                '''
-                if sth new is placed, then : 
-                    1. add self.action[index], self.objectEnergy[index]
-                    2. check and update value of min_energy
-                    3. update base, index, last_down_data
-                '''
+                realtime_data = np.mean(processed_data)    # decrease with non-conductive
+                real_time_energy = realtime_base - realtime_data
+
                 if self.index == 0:
                     self.last_mv_pos = 0
-                if real_time_energy > ACTION_ENERGY_THRESHOLD and self.object_filter(last_mv_pos, cur_mv_pos):  # Object DOWN && not the noise
-                    # 1. add self.action[index], self.objectEnergy[index]
-                    self.objectEnergy[self.index][k] = real_time_energy
-                    self.action[self.index] = 1
-                    # print("self.action["+str(self.index)+"]=1 Success!" + str(self.action[self.index]))
 
-                    # 2. check and update value of min_energy
+                # Object DOWN && not the noise
+                if cur_obj_energy > ACTION_ENERGY_THRESHOLD and self.object_filter(last_mv_pos, cur_mv_pos):
+                    # add self.action[index], self.objectEnergy[index]
+                    self.objectEnergy[self.index][k] = cur_obj_energy
+                    self.action[self.index] = cur_mv_pos
+
+                    # update value of min_energy
                     if self.index == 0:
-                        self.min_energy = real_time_energy
-                    elif real_time_energy < self.min_energy:
-                        self.min_energy = real_time_energy
-                    # print("self.min_energy: " + str(self.min_energy))
+                        self.min_energy = cur_obj_energy
+                    elif cur_obj_energy < self.min_energy:
+                        self.min_energy = cur_obj_energy
 
-                    # 3. update base, index, last_down_data
+                    # update base, index, last_down_data
                     self.base[k] = copy.deepcopy(self.data[k])
-                    print("                                            ACTION DOWN INDEX " + str(self.index) + ' energy ' + str(real_time_energy))
+                    print("                                            ACTION DOWN INDEX " + str(self.index) + ' energy ' + str(cur_obj_energy))
                     p_list = [i * 10 for i in self.point_set]
                     self.point_poly_fill(p_list)
                     # self.calPosition()
@@ -266,31 +256,17 @@ class FetchData:
                     self.index += 1
                     self.last_down_data = realtime_data
                     self.last_mv_pos = cur_mv_pos
-                    '''
-                    for i in range(self.r * self.c):
-                        self.energy_metrix[self.index][i//self.r][i % self.c] = energy_metrix[i] / 1000
-                        #print(str(self.index - 1) + "Line: " + str(i // self.r) , end = ' ')
-                        #for j in range(self.c):
-                        #print("self.energy_metrix[" + str(self.index) + '][' + str(i // self.r) + '][' + str(
-                                #i % self.c) + '] = ' + str(self.energy_metrix[self.index][i // self.r][i % self.c]), end = ' ')
-                        print("self.energy_metrix[" + str(self.index) + '][' + str(i // self.r) + '] = ' + str(np.mean(self.energy_metrix[self.index][i // self.r])), end = ' ')
-                            #print(self.energy_metrix[self.index][i // self.r][i % self.c], end = ' ')
-                            #print(self.energy_metrix[self.index-1][i // self.r][i % self.c], end = ' ')
-                    '''
 
                 elif ((realtime_data - self.last_down_data) - self.min_energy) > 0:  # Object UP
-                    # print("min_energy: "+str(min_energy))
-                    # print("signal decreasing")
                     for i in range(self.index):
-                        # print("action["+str(i)+"]" + str(self.action[i]))
-                        if self.action[i] == 1:
-                            # print("action[index]==1 detected.")
+                        if self.action[i] > 0:
+                            # print("action[index]>0 detected.")
                             # object_energy = self.calculateEnergy(self.objectEnergy[self.index][k])
                             object_energy = np.mean(self.objectEnergy[i][k])  # energy of object i
                             # print("energy of object  "+str(i)+" is  " + str(object_energy))
-                            # print('real_time_energy - object_energy = ' + str(real_time_energy)  + ' - ' + str(object_energy) + '=' + str(object_energy - real_time_energy))
                             # OBJECT_ENERGY_THRESHOLD: # True when things REALLY go UP
                             if abs(abs(realtime_data - self.last_down_data) - abs(object_energy)) < abs(object_energy) * 2:
+                                self.unknownPositionEnergy[int(self.action[i])] = 0
                                 self.action[i] = 0
                                 # self.index += 1
                                 self.base[k] = copy.deepcopy(self.data[k])
@@ -326,8 +302,10 @@ class FetchData:
 
     def newest_move(self):
         """Log the last movement on the cloth
+
         When something new is placed on the cloth,
         select meaningful points with value and get center point, equivalent energy.
+
         :returns: current moving point energy
         """
         points = np.zeros(MAX_DRAW_POINT * 2, np.int32)  # each point has 2 values: x and y.
@@ -337,8 +315,6 @@ class FetchData:
         area_threshold = 0
         for i in range(self.r):
             for j in range(self.c):
-                # print("Type of self.energy: {}".format(type(self.energy_metrix)))
-                # print("self.energy_metrix[0]= {}".format(i,j,self.energy_metrix.item(0)))
                 temp = self.energy_metrix[i * self.r + j]
                 if temp > max_energy:
                     max_energy = temp
@@ -445,9 +421,7 @@ class FetchData:
         if len(object_list) > 0:  # objects exist
             print("{} object(s) detected on the map.".format(len(object_list)))
             print_(object_list)
-
             polyfill(object_list[0].point_set)
-            print("Type of object_list[0].point_set is {}.".format(type(object_list[0].point_set)))
 
 
     # every thread, check and record the position history of every object(from indexMin to indexMax)
@@ -455,7 +429,7 @@ class FetchData:
         # print("start tracking object")
         for i in range(self.index):
             # self.tempIndex = i
-            if self.action[i] == 1:  # object(index) is down
+            if self.action[i] > 0:  # object(index) is down
                 if self.getCurrentPosition(i) != self.position[i]:
                     # print("object[" + str(i) + "] position unchanged")
                     # self.move[i] = False  # position of the object(index) stay unchanged
