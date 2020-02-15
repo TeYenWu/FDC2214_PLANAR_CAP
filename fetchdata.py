@@ -11,27 +11,20 @@ import serial.tools.list_ports
 import serial
 import numpy as np
 import matplotlib
-
-import matplotlib.pyplot as plt
-
-# import matplotlib.font_manager as fm
-matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.rcsetup as rcsetup
 import math
-import numpy as np
 import os
 import copy
 import cv2
-
 from sklearn.neighbors import NearestNeighbors
 # import feature_extraction8
 from sklearn import preprocessing
 from sklearn.externals import joblib
+from painter import *
 
-# import matplotlib
-
+matplotlib.use('TkAgg')
 print(rcsetup.all_backends)
 INTERNAL_MUX_MODE = 0
 EXTERNAL_MUX_MODE = 1
@@ -47,7 +40,7 @@ SINGLE_CAP_THRESHOLD = 50000
 ARDUINO_SERIAL_PORT = "COM4"
 CHANELL = 4
 SUPPORTED_ACTION_NUM = 100
-ACTION_ENERGY_THRESHOLD = 20000
+ACTION_ENERGY_THRESHOLD = 9000
 OBJECT_ENERGY_THRESHOLD = 1000
 MAX_DRAW_POINT = 256    # self.c * self.r
 AREA_PERCENT = 0.8
@@ -216,7 +209,6 @@ class FetchData:
                         self.base[k][i * self.c + j] = copy.deepcopy(self.data[k][i * self.c + j])
                         # self.action[self.index] = 1
         if self.start_object_recog:
-
             for k in range(self.layer):
                 processed_data = np.array([self.processData(self.data[k][i]) for i in range(self.totalChannel)])
                 processed_base = np.array([self.processData(self.base[k][i]) for i in range(self.totalChannel)])
@@ -237,7 +229,8 @@ class FetchData:
                 realtime_base = np.mean(processed_base)
                 realtime_data = np.mean(processed_data)  # !!! DECREASE when non-conductive
                 real_time_energy = - (realtime_data - realtime_base)
-                if real_time_energy > ACTION_ENERGY_THRESHOLD:
+                #if real_time_energy > ACTION_ENERGY_THRESHOLD:
+                if real_time_energy > 0:
                     print("Real time energy: {}".format(real_time_energy))
                 # print("real_time_energy = " + str(t_data) + '-' + str(t_base) + '=' + str(real_time_energy))    # always under
                 # if realtime_data - self.last_down_data > OBJECT_ENERGY_THRESHOLD:
@@ -265,7 +258,9 @@ class FetchData:
 
                     # 3. update base, index, last_down_data
                     self.base[k] = copy.deepcopy(self.data[k])
-                    print("ACTION DOWN INDEX " + str(self.index) + ' energy ' + str(real_time_energy))
+                    print("                                            ACTION DOWN INDEX " + str(self.index) + ' energy ' + str(real_time_energy))
+                    p_list = [i * 10 for i in self.point_set]
+                    self.point_poly_fill(p_list)
                     # self.calPosition()
                     self.track[self.index] = "track object[" + str(self.index) + "]:"
                     self.index += 1
@@ -299,7 +294,7 @@ class FetchData:
                                 self.action[i] = 0
                                 # self.index += 1
                                 self.base[k] = copy.deepcopy(self.data[k])
-                                print("ACTION UP INDEX" + str(i))
+                                print("                                            ACTION UP INDEX" + str(i))
                                 self.last_mv_pos = 0
                                 break
 
@@ -327,10 +322,10 @@ class FetchData:
         # time.sleep(0.01)
 
         # print("record took " + str(time.time() - start_time) + "s")
+        # self.point_poly_fill(self.point_set)
 
     def newest_move(self):
         """Log the last movement on the cloth
-
         When something new is placed on the cloth,
         select meaningful points with value and get center point, equivalent energy.
         :returns: current moving point energy
@@ -367,7 +362,6 @@ class FetchData:
             # print("No point generated.")
             return 0
         self.point_set = points[0: count]  # remove extra empty points, pass values of point_set to function drawShape
-
         # Calculate position and energy for capacity_center
         energy_sum = 0
         x_coordinate_energy_sum = 0
@@ -405,7 +399,7 @@ class FetchData:
         canvas *= 255
         # reshape to Object_number * (x,y); RESHAPE TO N*1*2
         point_shaped = self.point_set.reshape(-1, (count + 1) // 2, 2)
-        for i in range(0,len(point_shaped)):
+        for i in range(0, len(point_shaped)):
             point_shaped[i] = point_shaped[i] * 50
         # print("points after reshape")
         # print(point_shaped)
@@ -420,6 +414,41 @@ class FetchData:
         cv2.imwrite("polylines.png", canvas)
         # TODO: Too slow to run.
         # cv2.waitKey(0)
+
+    def point_poly_fill(self, point_set):
+        """Given points list, draw them on canvas with poly_fill algorithm.
+
+        :param point_set: a list, containing x1,y1,x2,y2...xn,yn
+        :param object_seq: which object should be painted on canvas
+        :return: returns nothing. Just draw pic as response.
+        """
+        # Construct object list
+        object_list = []
+        for i in range(0, len(point_set), 2):
+            found = False
+            if len(object_list) == 0:  # First object
+                object_list.append(Blob(point_set[i], point_set[i + 1]))
+                found = True
+            else:
+                for obj in range(len(object_list)):
+                    if object_list[obj].is_near(point_set[i], point_set[i + 1]):
+                        object_list[obj].update_rec(point_set[i], point_set[i + 1])
+                        found = True
+                        # print_(object_list)
+                        break
+            if not found:
+                object_list.append(Blob(point_set[i], point_set[i + 1]))
+                found = True
+                # print_(object_list)
+
+        # Show object list
+        if len(object_list) > 0:  # objects exist
+            print("{} object(s) detected on the map.".format(len(object_list)))
+            print_(object_list)
+
+            polyfill(object_list[0].point_set)
+            print("Type of object_list[0].point_set is {}.".format(type(object_list[0].point_set)))
+
 
     # every thread, check and record the position history of every object(from indexMin to indexMax)
     def timingTrack(self):
