@@ -17,7 +17,6 @@ bool stringComplete = false;  // whether the string is complete
 float base[ROW_NUM*COLUMN_NUM] = {0};
 ADC *adc = new ADC(); // adc object
 volatile uint32_t adcValue[REPEAT_COUNT] = {0};
-elapsedMicros timeElapsed;
 volatile uint32_t num_iter = 0;
 
 void(* resetFunc) (void) = 0; //declare reset function @ address 0

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 // This is a source file for FDC2214 library
 // By Harijs Zablockis, Intelitech, March 2018 
 // This file is based on NelsonsLog_FDC2214.c by Chris Nelson 

@@ -34,7 +34,6 @@ float diffValues[] = new float[r*c];
 void setup () {
   // set the window size:
   //fullScreen();
-  textSize(10);
   size(1000,1000);
   // init socket client
   myClient = new Client(this, "127.0.0.1", 5000);
@@ -59,8 +58,8 @@ void updateValues(){
       print("Data: ");
       for (int k = 0; k < layer; k++){
           for (int i = 0; i < r * c; i++){
-          //if(i%r >=cutoff || i/r >=cutoff) continue;
-          //if(i%r <=low_cutoff || i/r <=low_cutoff) continue;
+          if(i%r >=cutoff || i/r >=cutoff) continue;
+          if(i%r <=low_cutoff || i/r <=low_cutoff) continue;
           values[k][i] =  (Float.valueOf(data[i+k * r * c].trim()));
           print(values[k][i]);
           print(" ");
@@ -131,29 +130,16 @@ void fillHeatMap(){
   loadPixels();
   for (int k = 0; k < layer; k++){
     float interp_array[][] = bilinearInterpolation(values[k]);
-    float max_positive = 0;
-    float max_negative = 0;
-    for(int y=0; y < cellSize*r; y++){
-      for(int x = 0; x < cellSize*c; x++){
-        if((interp_array[y][x] > 0) && (max_positive < interp_array[y][x])){
-          max_positive = interp_array[y][x];
-        }
-        if((interp_array[y][x] < 0) && (max_negative > interp_array[y][x])){
-          max_negative = interp_array[y][x];
-        }
-      }
-    }
-          
-        
     for(int y=0; y < cellSize*r; y++){
       for(int x = 0; x < cellSize*c; x++){
             color c =  color(0,0,0);
             
             if(interp_array[y][x]<0){
              interp_values[y*width+x+k*heatMapGap] = int(-interp_array[y][x]*255);
-              c = getGrayGradientColor(interp_array[y][x], max_negative);
-            } else if(max_positive > 0.04 && interp_array[y][x]>max_positive * 0.8){
-              c = getGradientColor(interp_array[y][x], max_positive);            
+              c = getGrayGradientColor(interp_array[y][x], -1);
+            } else{
+             
+              c = getGradientColor(interp_array[y][x], 1);
             }
             pixels[y*width+x+k*heatMapGap] = c;
       }
@@ -257,7 +243,7 @@ void draw () {
     for (int i = 0; i < r * c; i++){
       print();
       fill(0, 102, 153);
-      textSize(16);
+      textSize(18);
       
       text(nf(values[k][i], 1, 3), (c-i%c-1)*cellSize + cellSize / 2 + k*heatMapGap, (r- i/c-1)*cellSize + cellSize / 2); 
        
