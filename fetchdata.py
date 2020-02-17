@@ -37,7 +37,7 @@ NON_CONDUCTIVE_PEAK = 100000
 CONDUCTIVE_PEAK = 3000000
 CAP_DECREASE_PEAK = 100000
 NON_NOISE_THRESHOLD = 10000
-SINGLE_CAP_THRESHOLD = 50000
+SINGLE_CAP_THRESHOLD = 5000000
 ARDUINO_SERIAL_PORT = "/dev/cu.usbmodem14631"
 CHANELL = 4
 
@@ -110,12 +110,12 @@ class FetchData:
                     # print(i)
                     if diff < 0:
                         if abs(diff) < CONDUCTIVE_THRESHOLD:
-                            ch.append(-diff/self.nonConductivePeak[k][i])
+                            ch.append(diff/self.nonConductivePeak[k][i])
                         else:
-                            ch.append(diff/self.conductivePeak[k][i])
+                            ch.append(-diff/self.conductivePeak[k][i])
                     else:
-                        # ch.append(diff/self.capDecreasePeak[k][i])
-                        ch.append(0)
+                        ch.append(diff/self.capDecreasePeak[k][i])
+                        # ch.append(0)
 
                 # print (data[i]-base[i])
                 # rawch.append(data[i])
@@ -216,33 +216,33 @@ class FetchData:
             j = candidate[2]
             index = i*self.c + j
             isDiffCap = True
-            minimum = 10000000
+            minimumY = 10000000
             for y in range(0, self.r):
                 index2 = y*self.c + j
                 if self.diffs[k][index2] > 0:
                     continue
                 if abs(self.diffs[k][index2]) < minimum:
-                    minimum = abs(self.diffs[k][index2])
+                    minimumY = abs(self.diffs[k][index2])
 
             if abs(self.diffs[k][index]) - minimum < SINGLE_CAP_THRESHOLD or minimum < NON_NOISE_THRESHOLD:
-                if minimum < NON_NOISE_THRESHOLD:
-                    minimum = abs(self.diffs[k][index])
+                if minimumY < NON_NOISE_THRESHOLD:
+                    minimumY = abs(self.diffs[k][index])
                 isDiffCap = False
 
-            # minimum = 10000000
+            minimumX = 10000000
             for x in range(0, self.c):
                 index2 = i*self.c + x
                 if self.diffs[k][index2] > 0:
                     continue
-                if abs(self.diffs[k][index2]) < minimum:
-                     minimum = abs(self.diffs[k][index2])
-            if abs(self.diffs[k][index]) - minimum < SINGLE_CAP_THRESHOLD or minimum < NON_NOISE_THRESHOLD:
-                if minimum < NON_NOISE_THRESHOLD:
-                    minimum = abs(self.diffs[k][index])
+                if abs(self.diffs[k][index2]) < minimumX:
+                     minimumX = abs(self.diffs[k][index2])
+            if abs(self.diffs[k][index]) - minimumX < SINGLE_CAP_THRESHOLD or minimumX < NON_NOISE_THRESHOLD:
+                if minimumX < NON_NOISE_THRESHOLD:
+                    minimumX = abs(self.diffs[k][index])
                 isDiffCap = False
 
             if not isDiffCap:
-                single_caps.append((k, i, j, minimum))
+                single_caps.append((k, i, j, minimumY, minimumX))
 
         for candidate in single_caps:
             k = candidate[0]
