@@ -23,6 +23,10 @@ from sklearn.neighbors import NearestNeighbors
 from sklearn import preprocessing
 from sklearn.externals import joblib
 from painter import *
+# For W & R CSV file
+import csv
+import random
+import time
 
 matplotlib.use('TkAgg')
 print(rcsetup.all_backends)
@@ -99,6 +103,7 @@ class FetchData:
         self.point_set = []
         self.mv_energy = 0
         self.last_mv_pos = 0
+        self.v_time = 0
 
         self.arduino_port = serial.Serial(port=ARDUINO_SERIAL_PORT, baudrate=250000)
         self.arduino_port.reset_input_buffer()
@@ -231,6 +236,19 @@ class FetchData:
                 realtime_data = np.mean(processed_data)    # decrease with non-conductive
                 real_time_energy = realtime_base - realtime_data
 
+                with open('energy.csv', 'a') as csv_file:
+                    csv_writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+                    # headers
+                    info = {
+                        "v_time": self.v_time,
+                        "v_base": realtime_base,
+                        "v_data": realtime_data,
+                        "v_energy": realtime_base - realtime_data
+                    }
+                    csv_writer.writerow(info)
+                    # print(self.v_time, realtime_base, realtime_data, realtime_data)
+
+
                 if self.index == 0:
                     self.last_mv_pos = 0
 
@@ -358,10 +376,10 @@ class FetchData:
     def object_filter(self, last_mv_pos, cur_mv_pos):
         t = abs(cur_mv_pos - last_mv_pos)
         if t < last_mv_pos // 24:
-            print("cur {} - last {} = {} Noise ignored.".format(cur_mv_pos, last_mv_pos, cur_mv_pos - last_mv_pos))
+            # print("cur {} - last {} = {} Noise ignored.".format(cur_mv_pos, last_mv_pos, cur_mv_pos - last_mv_pos))
             return False    # noise
         else:
-            print("cur {} - last {} = {} Real object detected.".format(cur_mv_pos, last_mv_pos, cur_mv_pos - last_mv_pos))
+            # print("cur {} - last {} = {} Real object detected.".format(cur_mv_pos, last_mv_pos, cur_mv_pos - last_mv_pos))
             return True
 
 
@@ -687,6 +705,11 @@ class FetchData:
 
 
 if __name__ == '__main__':
+    with open('energy.csv', 'w') as csv_file:
+        fieldnames = ["v_time", "v_base", "v_data", "v_energy"]
+        csv_writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+        csv_writer.writeheader()
+
     serialRead()
     # MSPComm("/dev/cu.usbmodem14141", "Test")
     fetchdata = FetchData()
