@@ -8,8 +8,8 @@
 #define ROW_NUM 16
 #define COLUMN_NUM 16
 #define MUXNUM 8
-#define REPEAT_COUNT 40
-int mux_control_pins[MUXNUM][3] = {{0, 1, 2}, {5, 6, 7}, {8, 9, 10}, {16, 17, 18}, {19, 20, 21}, {24, 25, 26}, {27, 28, 29}, {30, 31, 32}};
+#define REPEAT_COUNT 120
+int mux_control_pins[MUXNUM][3] = {{2, 1, 0}, {7, 6, 5}, {10, 9, 8}, {16, 17,  20}, {24, 25, 26}, {27, 28, 29},{30, 31, 32},{21, 12, 33}};
 FDC2214 capsense(FDC2214_I2C_ADDR_0); // Use FDC2214_I2C_ADDR_1 
 String inputString = "";         // a String to hold incoming data
 bool stringComplete = false;  // whether the string is complete
@@ -18,19 +18,17 @@ float base[ROW_NUM*COLUMN_NUM] = {0};
 ADC *adc = new ADC(); // adc object
 volatile uint32_t adcValue[REPEAT_COUNT] = {0};
 volatile uint32_t num_iter = 0;
-
+bool isSuccessful = false;
 void(* resetFunc) (void) = 0; //declare reset function @ address 0
 void setup() {
-  Wire.begin();
-  Wire.setClock(400000L);
-// 
-  Serial.begin(115200);
+ isSuccessful = false;
+  Serial.begin(500000);
   for(int i = 0; i < MUXNUM; i++){
     for(int j = 0; j < 3; j++){
         pinMode(mux_control_pins[i][j], OUTPUT); 
      }
   }
-
+  pinMode(MODE_SWITCH_PIN, OUTPUT);
   pinMode(CTRL, OUTPUT);
   pinMode(FSYNC, OUTPUT);
   pinMode(SCLK, OUTPUT);
@@ -39,17 +37,20 @@ void setup() {
   // initialize the output pins
   digitalWrite(CTRL, LOW);
   digitalWrite(FSYNC, HIGH);
-  
-  
+   digitalWrite(MODE_SWITCH_PIN, LOW);
+   
+//  Serial.println("SETTING I2C");
+  Wire.begin();
+  Wire.setClock(400000L);
    // ### Start FDC
   // Start FDC2212 with 2 channels init
-  Serial.println("SETTING FDC");
-//  bool capOk = capsense.begin(0x1, 0x4, 0x5, false); //setup first two channels, autoscan with 2 channels, deglitch at 10MHz, external oscillator
-//  if (capOk) Serial.println("Sensor Start");  
-//  else Serial.println("Sensor Fail");  
+//  Serial.println("SETTING FDC");
+ bool capOk = capsense.begin(0x1, 0x0, 0x5, false); //setup first two channels, autoscan with 2 channels, deglitch at 10MHz, external oscillator
+// if (capOk) Serial.println("Sensor Start");  
+// else Serial.println("Sensor Fail");  
 
 // ### set AD5930 and ADC
-  Serial.println("SETTING AD5930 AND ADC"); 
+//  Serial.println("SETTING AD5930 AND ADC"); 
   configAD5930();
   adc->adc0->enableInterrupts(adc0_isr);
   adc->adc0->setAveraging(1);
@@ -80,7 +81,7 @@ void setup() {
             }
           }
     
-          digitalWrite(MODE_SWITCH_PIN, LOW);
+          digitalWrite(MODE_SWITCH_PIN, HIGH);
           toggleCtrlPin(); 
           delayMicroseconds(10);
           base[i*COLUMN_NUM+j] = 0;
@@ -95,78 +96,115 @@ void setup() {
           }
          
           base[i*COLUMN_NUM+j] = base[i*COLUMN_NUM+j]/(REPEAT_COUNT*5);   
-//          Serial.println(base[i*COLUMN_NUM+j]);
       }
   }
+
+  
   inputString.reserve(200);
 }
 
 
 void loop() {
-
+  if(!isSuccessful){
+    Serial.println("BUILD SUCCESS");
+    isSuccessful = true;
+    return;
+  }
 //  delay(100);
 //  delayMicroseconds(100);//
 //  Serial.println("FDC AD5933 SETTING COMPLETE");
-  for(int i = 0; i < ROW_NUM; i++){
-      for(int j = 0; j < COLUMN_NUM; j++){.
+  for (int mode = 0; mode < 2; mode++){
+    digitalWrite(MODE_SWITCH_PIN, mode);
+    
+    if(mode == 0){
+        delay(1);
+      capsense.begin(0x1, 0x0, 0x5, false);
+      } else{
+      toggleCtrlPin();   
+     }
       
-          int row_mux = i / 4;
-          int row_mux_control = i % 4;
-          int col_mux = j / 4 + MUXNUM/2;
-          int col_mux_control = j % 4;
-          for (int k = 0; k <MUXNUM; k++){
-            if(k == row_mux){
-              digitalWrite(mux_control_pins[k][0], HIGH&row_mux_control);
-              digitalWrite(mux_control_pins[k][1], HIGH&(row_mux_control>>1));
-              digitalWrite(mux_control_pins[k][2], LOW);
+//     Serial.println("");
+//      Serial.println("");
+//       Serial.println("");
+//        Serial.println("");
+        
+    for(int i = 0; i < ROW_NUM; i++){
+        for(int j = 0; j < COLUMN_NUM; j++){
+            int row_mux = i / 4;
+            int row_mux_control = i % 4;
+            int col_mux = j / 4 + MUXNUM/2;
+            int col_mux_control = j % 4;
+//            int row_mux = 0;
+//            int row_mux_control = 0;
+//            int col_mux = 0 + MUXNUM/2;
+//            int col_mux_control = 0  ;
+            for (int k = 0; k <MUXNUM; k++){
+              if(k == row_mux){
+                digitalWrite(mux_control_pins[k][0], HIGH&row_mux_control);
+                digitalWrite(mux_control_pins[k][1], HIGH&(row_mux_control>>1));
+                digitalWrite(mux_control_pins[k][2], LOW);
+                
+              } else if (k == col_mux){
+                digitalWrite(mux_control_pins[k] [0], HIGH&col_mux_control);
+                digitalWrite(mux_control_pins[k][1], HIGH&(col_mux_control>>1));
+                digitalWrite(mux_control_pins[k][2], LOW);
+              }
+              else {
+                digitalWrite(mux_control_pins[k][2], HIGH);
+              }
+            }
+            
+            
+            // SWITCH TO TRANSMIT MODE    
+            if(mode == 1){
+              num_iter = 0;
               
-            } else if (k == col_mux){
-              digitalWrite(mux_control_pins[k][0], HIGH&col_mux_control);
-              digitalWrite(mux_control_pins[k][1], HIGH&(col_mux_control>>1));
-              digitalWrite(mux_control_pins[k][2], LOW);
-            }
-            else {
-              digitalWrite(mux_control_pins[k][2], HIGH);
-            }
-          }
-          num_iter = 0;
-          // SWITCH TO TRANSMIT MODE
-//          uint32_t start = micros();
-          digitalWrite(MODE_SWITCH_PIN, LOW);
-          toggleCtrlPin(); 
-          delayMicroseconds(10);
-          adc->adc0->startContinuous(READ_PIN);
-          while (num_iter<REPEAT_COUNT) {}
-          adc->adc0->stopContinuous();
-          float rmsValue= 0;
-          for(int k=0; k < REPEAT_COUNT; k++){
-            float value = (float)(adcValue[k]-base[i*COLUMN_NUM+j]);
-            rmsValue += value*value / REPEAT_COUNT;
-          }
-//          uint32_t end = micros();
-
-//          Serial.print(end - start);
-//          Serial.println(" MicroSeconds for 10 readings");
-          Serial.println(sqrt(rmsValue));
-//          Serial.print(" ");
-          
-          // SWITCH TO LOAD MODE   
-          digitalWrite(MODE_SWITCH_PIN, HIGH);
-          delayMicroseconds(10);
-          unsigned long capa; // variable to store data from FDC
-//          capa= capsense.getReading28(0);
-//          capa= capsense.getReading28(0);
-//          Serial.print(capa);  
-//          if (i == ROW_NUM -1 && j == COLUMN_NUM - 1) Serial.println("");
-//          else Serial.print(" ");
-//          
-      } 
-   }
-   if (stringComplete) {
-    if(inputString == "reset"){
-      resetFunc();
-    }
+              toggleCtrlPin(); 
+              delayMicroseconds(300);
+              adc->adc0->startContinuous(READ_PIN);
+              while (num_iter<REPEAT_COUNT) {}
+              adc->adc0->stopContinuous();
+              long rmsValue= 0;
+              for(int k=0; k < REPEAT_COUNT; k++){
+                
+//                if(i==0&&j==0){
+//                   Serial.print(adcValue[k]);
+//                   Serial.print(", ");
+//                }
+                int value = (adcValue[k]-base[i*COLUMN_NUM+j]);
+                rmsValue += value*value / REPEAT_COUNT;
+              }
+//              if(i==0&&j==1){
+//                 Serial.println(sqrt(rmsValue));
+////                 Serial.print(", ");
+//                }
+             Serial.print(sqrt(rmsValue));
+             if (i == ROW_NUM -1 && j == COLUMN_NUM - 1) Serial.println("");
+             else Serial.print(", ");
+             
+             
+           }else {
+              // SWITCH TO LOAD MODE  
+              unsigned long capa = 0; // variable to store data from FDC
+             capa= capsense.getReading28(0);
+////             delayMicroseconds(10);
+             capa= capsense.getReading28(0);
+             Serial.print(capa);  
+////              if (i == ROW_NUM -1 && j == COLUMN_NUM - 1) Serial.println("");
+////             else Serial.print(", ");
+             Serial.print(", ");
+            }      
+        } 
+     }
   }
+//   if (stringComplete) {
+//    if(inputString == "reset\n"){
+//      resetFunc();
+//      stringComplete = false;
+//      
+//      
+//    }
+//  }
 }
 
 void adc0_isr(void) {
@@ -181,15 +219,15 @@ void adc0_isr(void) {
 }
 
 void serialEvent() {
-  while (Serial.available()) {
-    // get the new byte:
-    char inChar = (char)Serial.read();
-    // add it to the inputString:
-    inputString += inChar;
-    // if the incoming character is a newline, set a flag so the main loop can
-    // do something about it:
-    if (inChar == '\n') {
-      stringComplete = true;
-    }
-  }
+//  while (Serial.available()) {
+//    // get the new byte:
+//    char inChar = (char)Serial.read();
+//    // add it to the inputString:
+//    inputString += inChar;
+//    // if the incoming character is a newline, set a flag so the main loop can
+//    // do something about it:
+//    if (inChar == '\n') {
+//      stringComplete = true;
+//    }
+//  }
 }

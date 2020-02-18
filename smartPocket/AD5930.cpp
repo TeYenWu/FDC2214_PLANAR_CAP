@@ -70,7 +70,7 @@ void configAD5930(){
   setStartFreq(100000); // Set start freqency 
   setDeltaFreq(0); // Set frequency increment
   setNumIncr(0); // Set number of increments
-  setTimeL(6);
+  setTimeL(60);
   /* not used in this code, check the datasheet carefully for your application */
 //  spiWriteWord(0x6000); // Set increment interval
 //  spiWriteWord(0x8000); // Set burst interval 

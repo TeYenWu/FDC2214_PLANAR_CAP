@@ -3,7 +3,7 @@
 
 #include <SPI.h>
 
-#define EXTERN_CLOCK_FREQ 16000000
+#define EXTERN_CLOCK_FREQ 50000000
 #define CTRL_REG_MASK 0x3
 #define CTRL 15 // PORTB_1
 #define FSYNC 14// PORTB_0

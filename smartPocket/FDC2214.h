@@ -108,6 +108,7 @@ public:
     unsigned long getReading16(uint8_t channel);
 // To be used with FDC2212 and FDC2214
     unsigned long getReading28(uint8_t channel);
+    void sleeping(bool mode);
 
 private:
     void loadSettings(uint8_t chanMask, uint8_t autoscanSeq, uint8_t deglitchValue, bool intOsc);

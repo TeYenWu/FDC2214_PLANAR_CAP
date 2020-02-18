@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 // This is a source file for FDC2214 library
 // By Harijs Zablockis, Intelitech, March 2018 
 // This file is based on NelsonsLog_FDC2214.c by Chris Nelson 
@@ -61,6 +60,14 @@ boolean FDC2214::begin(uint8_t chanMask, uint8_t autoscanSeq, uint8_t deglitchVa
     return true;
 }
 
+void FDC2214::sleeping(bool mode) {
+  if(mode){
+    write16FDC(FDC2214_CONFIG, 0x3E81);  //set config
+    }
+    else{
+      write16FDC(FDC2214_CONFIG, 0x1E81);  //set config
+      }
+}
 
 //Internal routine to do actual chip init
 void FDC2214::loadSettings(uint8_t chanMask, uint8_t autoscanSeq, uint8_t deglitchValue, bool intOsc) {
@@ -109,22 +116,22 @@ void FDC2214::loadSettings(uint8_t chanMask, uint8_t autoscanSeq, uint8_t deglit
 	}
 	// Init chan2, if selected by channel init mask
 	if (chanMask & 0x02) {
-		write16FDC(FDC2214_SETTLECOUNT_CH1, 0x0400);
-		write16FDC(FDC2214_RCOUNT_CH1, 0x08FF);
+		write16FDC(FDC2214_SETTLECOUNT_CH1, 0x0001);
+		write16FDC(FDC2214_RCOUNT_CH1, 0x0001);
 		write16FDC(FDC2214_OFFSET_CH1, 0x0000);
 		write16FDC(FDC2214_CLOCK_DIVIDERS_CH1, 0x2001);
 		write16FDC(FDC2214_DRIVE_CH1, 0xFC40);	
 	}	
 	if (chanMask & 0x04) {
-		write16FDC(FDC2214_SETTLECOUNT_CH2, 0x0400);
-		write16FDC(FDC2214_RCOUNT_CH2, 0x08FF);
+		write16FDC(FDC2214_SETTLECOUNT_CH2, 0x0001);
+		write16FDC(FDC2214_RCOUNT_CH2, 0x0001);
 		write16FDC(FDC2214_OFFSET_CH2, 0x0000);
 		write16FDC(FDC2214_CLOCK_DIVIDERS_CH2, 0x1001);
 		write16FDC(FDC2214_DRIVE_CH2, 0xF800);	
 	}	
 	if (chanMask & 0x08) {
-		write16FDC(FDC2214_SETTLECOUNT_CH3, 0x0400);
-		write16FDC(FDC2214_RCOUNT_CH3, 0x08FF);
+		write16FDC(FDC2214_SETTLECOUNT_CH3, 0x0001);
+		write16FDC(FDC2214_RCOUNT_CH3, 0x0001);
 		write16FDC(FDC2214_OFFSET_CH3, 0x0000);
 		write16FDC(FDC2214_CLOCK_DIVIDERS_CH3, 0x1001);
 		write16FDC(FDC2214_DRIVE_CH3, 0xF800);	
