@@ -38,16 +38,11 @@ CONDUCTIVE_THRESHOLD = 600000
 NON_CONDUCTIVE_PEAK = 600000
 CONDUCTIVE_PEAK = 5000000  # TO ++
 CAP_DECREASE_PEAK = 100000
-<<<<<<< HEAD
+
 NON_NOISE_THRESHOLD = 10000
 SINGLE_CAP_THRESHOLD = 5000000
-ARDUINO_SERIAL_PORT = "/dev/cu.usbmodem14631"
-=======
-NON_NOISE_THRESHOLD = 5000
-SINGLE_CAP_THRESHOLD = 50000
-# Specific Port related to your device
-ARDUINO_SERIAL_PORT = "COM4"
->>>>>>> a43a528be577680ad51f9bbd538e14449a1ff269
+ARDUINO_SERIAL_PORT = "COM5"
+
 CHANELL = 4
 SUPPORTED_ACTION_NUM = 100
 ACTION_ENERGY_THRESHOLD = 10000
@@ -83,12 +78,13 @@ class FetchData:
         self.conn = None
         self.r = 16
         self.c = 16
-        self.layer = 1
         self.recalibration = False
         self.calibration = True
         self.totalChannel = self.r * self.c
-        self.data = np.zeros((self.layer, self.totalChannel, WINDOW_SIZE))
-        self.base = np.zeros((self.layer, self.totalChannel, WINDOW_SIZE))
+        self.data = np.zeros((self.totalChannel, WINDOW_SIZE))
+        self.base = np.zeros((self.totalChannel, WINDOW_SIZE))
+        self.data_p = np.zeros((self.totalChannel, WINDOW_SIZE))
+
         # self.cur = np.zeros((self.layer, self.totalChannel, WINDOW_SIZE))
         # self.chg = np.zeros((self.layer, self.totalChannel, WINDOW_SIZE))
         self.index = 0
@@ -102,8 +98,8 @@ class FetchData:
         self.tempIndex = 0
         # (用了下中文:> )循环中的i不是self对象的类变量，不能作为getCurrentPosition()函数的参数，所以建立用来临时传参的变量self.tempIndex表示目前遍历到的物体的索引值以返回这个物体的currentPosition
 
-        self.lastData = np.zeros((self.layer, self.totalChannel, WINDOW_SIZE))
-        self.objectEnergy = np.zeros((SUPPORTED_ACTION_NUM, self.layer, self.totalChannel))
+        self.lastData = np.zeros((self.totalChannel, WINDOW_SIZE))
+        self.objectEnergy = np.zeros((SUPPORTED_ACTION_NUM, self.totalChannel))
         self.min_energy = 0
         self.last_down_data = 0
         self.point_set = []
@@ -153,41 +149,16 @@ class FetchData:
             ch = []
             rawch = []
 
-            for k in range(self.layer):
-                for i in range(self.r * self.c):
-                    diff = self.diffs[k][i]
-                    # print(i)
-<<<<<<< HEAD
-                    if diff < 0:
-                        if abs(diff) < CONDUCTIVE_THRESHOLD:
-                            ch.append(diff/self.nonConductivePeak[k][i])
-                        else:
-                            ch.append(-diff/self.conductivePeak[k][i])
-                    else:
-                        ch.append(diff/self.capDecreasePeak[k][i])
-                        # ch.append(0)
-=======
-                    if diff < CONDUCTIVE_THRESHOLD:
-                        ch.append(diff / self.nonConductivePeak[k][i])
-                    else:
-                        ch.append((-diff / self.conductivePeak[k][i]))
-
-            ''' unlike ch(if diff[]>0 diff[]=0), zh is raw data - base
-            zh = []
             for i in range(self.r * self.c):
-                zh.append(self.energy_metrix[self.index][i//8][i % 8])
-            '''
->>>>>>> a43a528be577680ad51f9bbd538e14449a1ff269
+                diff = self.diffs[i]
+                if diff < 0:
+                    if abs(diff) < CONDUCTIVE_THRESHOLD:
+                        ch.append(diff/self.nonConductivePeak[i])
+                    else:
+                        ch.append(-diff/self.conductivePeak[i])
+                else:
+                    ch.append(diff/self.capDecreasePeak[i])
 
-            # print (data[i]-base[i])
-            # rawch.append(data[i])
-            # for i in range(self.r * self.c):
-            #     diff1 = self.processData(self.data[0][i]) - self.processData(self.base[0][i])
-            #     diff2 = self.processData(self.data[1][i]) - self.processData(self.base[1][i])
-
-            #     diff = abs(diff1)-abs(diff2)
-
-            #     ch.append(diff/CONDUCTIVE_THRESHOLD)
             if self.conn:
                 try:
                     self.conn.send((' '.join(str(e) for e in ch) + '\n').encode())
@@ -217,97 +188,88 @@ class FetchData:
         # print(("result"))
         # print((result))
         result_arr = result.split(", ")
+        result_arr_load = result_arr[0:256]
+        result_arr_tran = result_arr[256:512]
         # print("result_arr")
         # print(result_arr)  # no increase
 
         for i in range(self.r):
             for j in range(self.c):
-                for k in range(self.layer):
-                    # fill in self.data from zero to arduino_port
-                    self.data[k][i * self.c + j][:-1] = self.data[k][i * self.c + j][1:]
-                    #                    print("self.data " + str(self.data))  # no increase
-                    self.data[k][i * self.c + j][-1] = int(result_arr[i * self.c * self.layer + j * self.layer + k])
-                    if self.calibration:
-                        self.base[k][i * self.c + j] = copy.deepcopy(self.data[k][i * self.c + j])
+                # fill in self.data from zero to arduino_port
+                self.data[i * self.c + j][:-1] = self.data[i * self.c + j][1:]
+                self.data[i * self.c + j][-1] = int(float(result_arr_load[i * self.c + j]))
+                if self.calibration:
+                    self.base[i * self.c + j] = copy.deepcopy(self.data[i * self.c + j])
+
+                self.data_p[i * self.c + j][:-1] = self.data_p[i * self.c + j][1:]
+                self.data_p[i * self.c + j][-1] = int(float(result_arr_tran[i * self.c + j]))
+                print("self.data_p: {}".format(self.data_p))
+
 
         if self.start_object_recog:
-            for k in range(self.layer):
-                processed_data = np.array([self.processData(self.data[k][i]) for i in range(self.totalChannel)])
-                processed_base = np.array([self.processData(self.base[k][i]) for i in range(self.totalChannel)])
-                self.energy_metrix = processed_base - processed_data  # 1*64,energy at the moment
-                # for i in self.energy_metrix:
-                    # print("Energy_metix: {}".format(self.energy_metrix))
-                last_mv_pos = self.last_mv_pos
-                # print("last_mv_pos: {}".format(self.last_mv_pos))
+            processed_data = np.array([self.processData(self.data[i]) for i in range(self.totalChannel)])
+            processed_base = np.array([self.processData(self.base[i]) for i in range(self.totalChannel)])
+            self.energy_metrix = processed_base - processed_data  # 1*64,energy at the moment
+            # for i in self.energy_metrix:
+                # print("Energy_metix: {}".format(self.energy_metrix))
+            last_mv_pos = self.last_mv_pos
+            # print("last_mv_pos: {}".format(self.last_mv_pos))
 
-                cur_mv_pos = self.newest_move()     # last_mv_pos updated
-                # print("Current_mv_pos: {}".format(cur_mv_pos))
+            cur_mv_pos = self.newest_move()     # last_mv_pos updated
+            # print("Current_mv_pos: {}".format(cur_mv_pos))
 
-                self.unknownPositionEnergy[cur_mv_pos] = self.mv_energy
-                cur_obj_energy = self.mv_energy
-                # print("unknownposition: ")
-                # print(self.unknownPositionEnergy)
+            self.unknownPositionEnergy[cur_mv_pos] = self.mv_energy
+            cur_obj_energy = self.mv_energy
+            # print("unknownposition: ")
+            # print(self.unknownPositionEnergy)
 
-                #self.timingTrack()
-                realtime_base = np.mean(processed_base)
-                realtime_data = np.mean(processed_data)    # decrease with non-conductive
-                real_time_energy = realtime_base - realtime_data
+            #self.timingTrack()
+            realtime_base = np.mean(processed_base)
+            realtime_data = np.mean(processed_data)    # decrease with non-conductive
+            real_time_energy = realtime_base - realtime_data
 
-                with open('energy.csv', 'a') as csv_file:
-                    csv_writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
-                    # headers
-                    info = {
-                        "v_time": self.v_time,
-                        "v_base": realtime_base,
-                        "v_data": realtime_data,
-                        "v_energy": realtime_base - realtime_data
-                    }
-                    csv_writer.writerow(info)
-                    # print(self.v_time, realtime_base, realtime_data, realtime_data)
+            if self.index == 0:
+                self.last_mv_pos = 0
 
+            # Object DOWN && not the noise
+            if cur_obj_energy > ACTION_ENERGY_THRESHOLD and self.object_filter(last_mv_pos, cur_mv_pos):
+                # add self.action[index], self.objectEnergy[index]
+                self.objectEnergy[self.index] = cur_obj_energy
+                self.action[self.index] = cur_mv_pos
 
+                # update value of min_energy
                 if self.index == 0:
-                    self.last_mv_pos = 0
+                    self.min_energy = cur_obj_energy
+                elif cur_obj_energy < self.min_energy:
+                    self.min_energy = cur_obj_energy
 
-                # Object DOWN && not the noise
-                if cur_obj_energy > ACTION_ENERGY_THRESHOLD and self.object_filter(last_mv_pos, cur_mv_pos):
-                    # add self.action[index], self.objectEnergy[index]
-                    self.objectEnergy[self.index][k] = cur_obj_energy
-                    self.action[self.index] = cur_mv_pos
+                # update base, index, last_down_data
+                self.base = copy.deepcopy(self.data)
+                print("                                            ACTION DOWN INDEX " + str(self.index) + ' energy ' + str(cur_obj_energy))
+                p_list = [i * 10 for i in self.point_set]
+                self.point_poly_fill(p_list)
+                # self.calPosition()
+                self.track[self.index] = "track object[" + str(self.index) + "]:"
+                self.index += 1
+                self.last_down_data = realtime_data
+                self.last_mv_pos = cur_mv_pos
 
-                    # update value of min_energy
-                    if self.index == 0:
-                        self.min_energy = cur_obj_energy
-                    elif cur_obj_energy < self.min_energy:
-                        self.min_energy = cur_obj_energy
-
-                    # update base, index, last_down_data
-                    self.base[k] = copy.deepcopy(self.data[k])
-                    print("                                            ACTION DOWN INDEX " + str(self.index) + ' energy ' + str(cur_obj_energy))
-                    p_list = [i * 10 for i in self.point_set]
-                    self.point_poly_fill(p_list)
-                    # self.calPosition()
-                    self.track[self.index] = "track object[" + str(self.index) + "]:"
-                    self.index += 1
-                    self.last_down_data = realtime_data
-                    self.last_mv_pos = cur_mv_pos
-
-                elif ((realtime_data - self.last_down_data) - self.min_energy) > 0:  # Object UP
-                    for i in range(self.index):
-                        if self.action[i] > 0:
-                            # print("action[index]>0 detected.")
-                            # object_energy = self.calculateEnergy(self.objectEnergy[self.index][k])
-                            object_energy = np.mean(self.objectEnergy[i][k])  # energy of object i
-                            # print("energy of object  "+str(i)+" is  " + str(object_energy))
-                            # OBJECT_ENERGY_THRESHOLD: # True when things REALLY go UP
-                            if abs(abs(realtime_data - self.last_down_data) - abs(object_energy)) < abs(object_energy) * 2:
-                                self.unknownPositionEnergy[int(self.action[i])] = 0
-                                self.action[i] = 0
-                                # self.index += 1
-                                self.base[k] = copy.deepcopy(self.data[k])
-                                print("                                            ACTION UP INDEX" + str(i))
-                                self.last_mv_pos = 0
-                                break
+            elif ((realtime_data - self.last_down_data) - self.min_energy) > 0:  # Object UP
+                for i in range(self.index):
+                    if self.action[i] > 0:
+                        # print("action[index]>0 detected.")
+                        # object_energy = self.calculateEnergy(self.objectEnergy[self.index][k])
+                        object_energy = np.mean(self.objectEnergy[i])  # energy of object i
+                        # print("energy of object  "+str(i)+" is  " + str(object_energy))
+                        # OBJECT_ENERGY_THRESHOLD: # True when things REALLY go UP
+                        if abs(abs(realtime_data - self.last_down_data) - abs(object_energy)) < abs(object_energy) * 2:
+                            self.unknownPositionEnergy[int(self.action[i])] = 0
+                            self.action[i] = 0
+                            # self.index += 1
+                            self.base = copy.deepcopy(self.data)
+                            print("                                            ACTION UP INDEX" + str(i))
+                            self.last_mv_pos = 0
+                            break
 
             # for i in range(self.totalChannel):
             #     before_data = self.cur[k][i]
@@ -337,10 +299,8 @@ class FetchData:
 
     def newest_move(self):
         """Log the last movement on the cloth
-
         When something new is placed on the cloth,
         select meaningful points with value and get center point, equivalent energy.
-
         :returns: current moving point energy
         """
         points = np.zeros(MAX_DRAW_POINT * 2, np.int32)  # each point has 2 values: x and y.
@@ -428,7 +388,6 @@ class FetchData:
 
     def point_poly_fill(self, point_set):
         """Given points list, draw them on canvas with poly_fill algorithm.
-
         :param point_set: a list, containing x1,y1,x2,y2...xn,yn
         :param object_seq: which object should be painted on canvas
         :return: returns nothing. Just draw pic as response.
@@ -491,73 +450,67 @@ class FetchData:
 
     def adjustPeak(self):
         self.isTouch = False
-        for k in range(self.layer):
-            for i in range(self.totalChannel):
-                diff = self.diffs[k][i]
-                if diff < 0 and not self.recalibration:
-                    if abs(diff) < CONDUCTIVE_THRESHOLD and abs(diff) > self.nonConductivePeak[k][i]:
-                        self.nonConductivePeak[k][i] = abs(diff)
-                    elif abs(diff) >= CONDUCTIVE_THRESHOLD:
-                        if abs(diff) > self.conductivePeak[k][i]:
-                            self.conductivePeak[k][i] = abs(diff)
-                elif diff > 0 and abs(diff) > self.capDecreasePeak[k][i] and not self.recalibration:
-                    self.capDecreasePeak[k][i] = abs(diff)
+        for i in range(self.totalChannel):
+            diff = self.diffs[i]
+            if diff < 0 and not self.recalibration:
+                if abs(diff) < CONDUCTIVE_THRESHOLD and abs(diff) > self.nonConductivePeak[i]:
+                    self.nonConductivePeak[i] = abs(diff)
+                elif abs(diff) >= CONDUCTIVE_THRESHOLD:
+                    if abs(diff) > self.conductivePeak[i]:
+                        self.conductivePeak[i] = abs(diff)
+            elif diff > 0 and abs(diff) > self.capDecreasePeak[i] and not self.recalibration:
+                self.capDecreasePeak[i] = abs(diff)
 
 
     def getCurrent(self):
         """Gets current signal.
         """
-        for k in range(self.layer):
-            for i in range(self.totalChannel):
-                processed_data = self.processData(self.data[k][i])
-                processed_base = self.processData(self.base[k][i])
-                diff = processed_data
-                self.cur[k][i] = diff
-                print("current diff: ")
-                print(diff)
-        # now we get current signal of the whole map
+        for i in range(self.totalChannel):
+            processed_data = self.processData(self.data[i])
+            processed_base = self.processData(self.base[i])
+            diff = processed_data
+            self.cur[i] = diff
+            print("current diff: ")
+            print(diff)
+    # now we get current signal of the whole map
 
     def getChanged(self):
-        for k in range(self.layer):
-            for i in range(self.totalChannel):
-                processed_data = self.processData(self.data[k][i])
-                processed_base = self.processData(self.base[k][i])
-                diff = processed_base
-                self.chg[k][i] = diff
-                print("changed diff: ")
-                print(diff)
+        for i in range(self.totalChannel):
+            processed_data = self.processData(self.data[i])
+            processed_base = self.processData(self.base[i])
+            diff = processed_base
+            self.chg[i] = diff
+            print("changed diff: ")
+            print(diff)
         # now we get current signal of the whole map after changing
 
 
     def calDiff(self):
         """Calculate diffs[][]
         """
-        for k in range(self.layer):
-            for i in range(self.totalChannel):
-                processed_data = self.processData(self.data[k][i])
-                processed_base = self.processData(self.base[k][i])
-                diff = processed_data - processed_base
-                if (diff > 0):
-                    # self.base[k][i] = [processed_base]*WINDOW_SIZE
-                    diff = 0
-                else:
-                    diff = abs(diff)
-                #                print("diff")
-                #                print(diff)
-                self.diffs[k][i] = diff
+        for i in range(self.totalChannel):
+            processed_data = self.processData(self.data[i])
+            processed_base = self.processData(self.base[i])
+            diff = processed_data - processed_base
+            if (diff > 0):
+                # self.base[i] = [processed_base]*WINDOW_SIZE
+                diff = 0
+            else:
+                diff = abs(diff)
+            #                print("diff")
+            #                print(diff)
+            self.diffs[i] = diff
 
     def calPosition(self):
         print("Diffs: ")
-        for k in range(self.layer):
-            for i in range(self.totalChannel):
-                print(self.diffs[k][i])
+        for i in range(self.totalChannel):
+            print(self.diffs[i])
 
     def returnCalDiff(self):
-        for k in range(self.layer):
-            for i in range(self.totalChannel):
-                processed_data = self.processData(self.data[k][i])
-                processed_base = self.processData(self.base[k][i])
-                return processed_data, processed_base
+        for i in range(self.totalChannel):
+            processed_data = self.processData(self.data[i])
+            processed_base = self.processData(self.base[i])
+            return processed_data, processed_base
 
     def recgMaterial(self):
         # To get diffs[][]
@@ -565,21 +518,19 @@ class FetchData:
         #        print("Max of the metrix is ", max_metrix)
         useful_points = []
         cover_rate = 0.9
-        for k in range(self.layer):
-            for i in range(self.r):
-                for j in range(self.c):
-                    index = i * self.c + j
-                    t = abs(self.diffs[k][index])
-                    if (t > max_metrix * cover_rate):
-                        useful_points.append(t)
+        for i in range(self.r):
+            for j in range(self.c):
+                index = i * self.c + j
+                t = abs(self.diffs[index])
+                if (t > max_metrix * cover_rate):
+                    useful_points.append(t)
         avr = np.mean(useful_points)  # avr
 
     #        print("Average of this type is ", avr)
 
     def scaleDiff(self):
-        for k in range(self.layer):
-            for i in range(self.totalChannel):
-                self.diffs[k][i] = self.diffs[k][i] / self.conductivePeak[k][i]
+        for i in range(self.totalChannel):
+            self.diffs[i] = self.diffs[i] / self.conductivePeak[i]
 
 
     def cancelSingleCap2(self):
@@ -587,156 +538,66 @@ class FetchData:
         """
         candidates = []
         rate = 0.7
-        for k in range(self.layer):
-            for i in range(self.r):
-                row_caps = [(self.diffs[k][i * self.c + j]) for j in range(self.c)]
-                maximum = max(row_caps)
-                minimum = min(row_caps)
+        for i in range(self.r):
+            row_caps = [(self.diffs[i * self.c + j]) for j in range(self.c)]
+            maximum = max(row_caps)
+            minimum = min(row_caps)
 
-                for j in range(self.c):
-<<<<<<< HEAD
-                    index = i*self.c + j
-                    diff = self.diffs[k][index]
-                    if abs(diff) > NON_NOISE_THRESHOLD and diff < 0:
-                        candidates.append((k, i, j))
+            for j in range(self.c):
+                index = i*self.c + j
+                diff = self.diffs[index]
+                if abs(diff) > NON_NOISE_THRESHOLD and diff < 0:
+                    candidates.append((i, j))
         single_caps = []
         for candidate in candidates:
-            k = candidate[0]
-            i = candidate[1]
-            j = candidate[2]
+            i = candidate[0]
+            j = candidate[1]
             index = i*self.c + j
             isDiffCap = True
             minimumY = 10000000
             for y in range(0, self.r):
                 index2 = y*self.c + j
-                if self.diffs[k][index2] > 0:
+                if self.diffs[index2] > 0:
                     continue
-                if abs(self.diffs[k][index2]) < minimum:
-                    minimumY = abs(self.diffs[k][index2])
+                if abs(self.diffs[index2]) < minimum:
+                    minimumY = abs(self.diffs[index2])
 
-            if abs(self.diffs[k][index]) - minimum < SINGLE_CAP_THRESHOLD or minimum < NON_NOISE_THRESHOLD:
+            if abs(self.diffs[index]) - minimum < SINGLE_CAP_THRESHOLD or minimum < NON_NOISE_THRESHOLD:
                 if minimumY < NON_NOISE_THRESHOLD:
-                    minimumY = abs(self.diffs[k][index])
+                    minimumY = abs(self.diffs[index])
                 isDiffCap = False
 
             minimumX = 10000000
             for x in range(0, self.c):
                 index2 = i*self.c + x
-                if self.diffs[k][index2] > 0:
+                if self.diffs[index2] > 0:
                     continue
-                if abs(self.diffs[k][index2]) < minimumX:
-                     minimumX = abs(self.diffs[k][index2])
-            if abs(self.diffs[k][index]) - minimumX < SINGLE_CAP_THRESHOLD or minimumX < NON_NOISE_THRESHOLD:
+                if abs(self.diffs[index2]) < minimumX:
+                     minimumX = abs(self.diffs[index2])
+            if abs(self.diffs[index]) - minimumX < SINGLE_CAP_THRESHOLD or minimumX < NON_NOISE_THRESHOLD:
                 if minimumX < NON_NOISE_THRESHOLD:
-                    minimumX = abs(self.diffs[k][index])
+                    minimumX = abs(self.diffs[index])
                 isDiffCap = False
 
             if not isDiffCap:
-                single_caps.append((k, i, j, minimumY, minimumX))
+                single_caps.append((i, j, minimumY, minimumX))
 
         for candidate in single_caps:
-            k = candidate[0]
-            i = candidate[1]
-            j = candidate[2]
-            minimum = candidate[3]
+            i = candidate[0]
+            j = candidate[1]
+            minimum = candidate[2]
             index = i*self.c + j
-            self.diffs[k][index] += minimum
-=======
-                    index = i * self.c + j
-                    # if(self.diffs[k][index]) < maximum * rate :
-                    self.diffs[k][index] = ((self.diffs[k][index]) - minimum)
-                    # self.diffs[k][index] = 0
+            self.diffs[index] += minimum
 
-            for j in range(self.c):
-                col_caps = [(self.diffs[k][i * self.c + j]) for i in range(self.r)]
-                col_caps_filter = list(filter(lambda c: c > NON_NOISE_THRESHOLD, col_caps))
-                # print("filter")
-                # print(col_caps_filter)
-                if len(col_caps_filter) == 0:
-                    continue
-                minimum = min(col_caps_filter)
-                maximum = max(col_caps_filter)
-
-                for i in range(self.r):
-                    index = i * self.c + j
-                    # if (self.diffs[k][index]) < maximum * rate:
-                    self.diffs[k][index] = ((self.diffs[k][index]) - minimum)
-                    # self.diffs[k][index] = 0
-
-    def cancelSingleCap(self):
-        candidates = []
-        for k in range(self.layer):
-            for i in range(self.r):
-                row_caps = [abs(self.diffs[k][i * self.c + j]) for j in range(self.c)]
-                minimum = min(row_caps)
-
-                for j in range(self.c):
-                    index = i * self.c + j
-                    self.diffs[k][index] = -(abs(self.diffs[k][index]) - minimum)
-            for j in range(self.c):
-                col_caps = [abs(self.diffs[k][i * self.c + j]) if abs(
-                    self.diffs[k][i * self.c + j]) > NON_NOISE_THRESHOLD else 10000000 for i in range(self.r)]
-                minimum = min(col_caps)
-                if minimum == 10000000:
-                    continue
-                for i in range(self.r):
-                    index = i * self.c + j
-                    self.diffs[k][index] = -(abs(self.diffs[k][index]) - minimum)
-        # single_caps = []
-        #
-        # for i in range(self.r):
-        #
-        # for candidate in candidates:
-        #     k = candidate[0]
-        #     i = candidate[1]
-        #     j = candidate[2]
-        #     index = i*self.c + j
-        #     isDiffCap = True
-        #     minimumY = 10000000
-        #     for y in range(0, self.r):
-        #         index2 = y*self.c + j
-        #         if self.diffs[k][index2] > 0:
-        #             continue
-        #         if abs(self.diffs[k][index2]) < minimumY:
-        #             minimumY = abs(self.diffs[k][index2])
-        #
-        #     if abs(self.diffs[k][index]) - minimumY < SINGLE_CAP_THRESHOLD or minimumY < NON_NOISE_THRESHOLD:
-        #         if minimumY < NON_NOISE_THRESHOLD:
-        #             minimumY = abs(self.diffs[k][index])
-        #         isDiffCap = False
-        #
-        #     # minimum = 10000000
-        #     for x in range(0, self.c):
-        #         index2 = i*self.c + x
-        #         if self.diffs[k][index2] > 0:
-        #             continue
-        #         if abs(self.diffs[k][index2]) < minimum:
-        #              minimum = abs(self.diffs[k][index2])
-        #     if abs(self.diffs[k][index]) - minimum < SINGLE_CAP_THRESHOLD or minimum < NON_NOISE_THRESHOLD:
-        #         if minimum < NON_NOISE_THRESHOLD:
-        #             minimum = abs(self.diffs[k][index])
-        #         isDiffCap = False
-        #
-        #     if not isDiffCap:
-        #         single_caps.append((k, i, j, minimum))
-        #
-        # for candidate in single_caps:
-        #     k = candidate[0]
-        #     i = candidate[1]
-        #     j = candidate[2]
-        #     minimum = candidate[3]
-        #     index = i*self.c + j
-        #     self.diffs[k][index] += minimum
->>>>>>> a43a528be577680ad51f9bbd538e14449a1ff269
 
     def reset(self):
         self.recalibration = True
-        self.nonConductivePeak = np.ones((self.layer, self.totalChannel)) * NON_CONDUCTIVE_PEAK
-        self.conductivePeak = np.ones((self.layer, self.totalChannel)) * CONDUCTIVE_PEAK
-        self.capDecreasePeak = np.ones((self.layer, self.totalChannel)) * CAP_DECREASE_PEAK
+        self.nonConductivePeak = np.ones((self.totalChannel)) * NON_CONDUCTIVE_PEAK
+        self.conductivePeak = np.ones((self.totalChannel)) * CONDUCTIVE_PEAK
+        self.capDecreasePeak = np.ones((self.totalChannel)) * CAP_DECREASE_PEAK
         self.arduino_port.write("reset\n".encode())
-        self.diffs = np.zeros((self.layer, self.totalChannel))
-        # self.pre_deformed_data = np.ones((self.layer, self.totalChannel))
+        self.diffs = np.zeros((self.totalChannel))
+        # self.pre_deformed_data = np.ones((self.totalChannel))
 
     def start(self):
         # plt.ion()
@@ -771,11 +632,6 @@ class FetchData:
 
 
 if __name__ == '__main__':
-    with open('energy.csv', 'w') as csv_file:
-        fieldnames = ["v_time", "v_base", "v_data", "v_energy"]
-        csv_writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
-        csv_writer.writeheader()
-
     serialRead()
     # MSPComm("/dev/cu.usbmodem14141", "Test")
     fetchdata = FetchData()
