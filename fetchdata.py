@@ -48,7 +48,7 @@ SUPPORTED_ACTION_NUM = 100
 ACTION_ENERGY_THRESHOLD = 10000
 OBJECT_ENERGY_THRESHOLD = 1000
 MAX_DRAW_POINT = 256    # self.c * self.r
-AREA_PERCENT = 0.8
+AREA_PERCENT = 0.7
 CANVAS_WIDTH = 800
 CANVAS_HEIGHT = 800
 
@@ -163,29 +163,30 @@ class FetchData:
         Read diffs[][], calculate and get ch[].
         """
         while 1:
-            self.fetch_ch_data()
-            pos = []
-            for i in range(self.r * self.c):
-                diff = self.diffs_p[i]
-                if diff > 0:
-                    pos.append(diff / 300)
-                else:
-                    pos.append(diff / 300)
+            if self.fetch_ch_data():
+                pos = []
+                for i in range(self.r * self.c):
+                    diff = self.diffs_p[i]
+                    if diff > 0:
+                        pos.append(diff / 300)
+                    else:
+                        pos.append(diff / 300)
 
-            if self.conn:
-                try:
-                    self.conn.send((' '.join(str(e) for e in pos) + '\n').encode())
-                except:
-                    self.conn.close()
-                    self.conn = None
-                    print("Connectioon broken")
+                if self.conn:
+                    try:
+                        self.conn.send((' '.join(str(e) for e in pos) + '\n').encode())
+                    except:
+                        self.conn.close()
+                        self.conn = None
+                        print("Connectioon broken")
+
 
 
 
     def fetch_ch_data(self):
         """Read signal from arduino_port, Calibrate them by substracting base. So we get diffs[][]
         """
-        print("fetchData")
+        # print("fetchData")
         result = self.arduino_port.readline().decode()
         result_arr = result.split(", ")
         result_arr_load = result_arr[0:64]
@@ -193,65 +194,136 @@ class FetchData:
 
         for i in range(self.r):
             for j in range(self.c):
-                # fill in self.data from zero to arduino_port
+                # fill in self.data from zero to Arduino port
+                self.data[i * self.c + j][:-1] = self.data[i * self.c + j][1:]
+                self.data[i * self.c + j][-1] = int(float(result_arr_load[i * self.c + j]))
                 self.data_p[i * self.c + j][:-1] = self.data_p[i * self.c + j][1:]
                 self.data_p[i * self.c + j][-1] = int(float(result_arr_tran[i * self.c + j]))
                 if self.calibration:
-                    #self.base[i * self.c + j] = copy.deepcopy(self.data[i * self.c + j])
+                    self.base[i * self.c + j] = copy.deepcopy(self.data[i * self.c + j])
                     self.base_p[i * self.c + j] = copy.deepcopy(self.data_p[i * self.c + j])
 
-        if self.start_object_recog==False:
-            print("NOT start object recog")
+        if self.start_object_recog: # Press R on key board
+            # from self.c*self.r*10 to self.c*self.r, so we get real time position metrix and energy metrix(self.c * self.r).
+            processed_data = np.array([self.processData(self.data[i]) for i in range(self.totalChannel)])
+            processed_base = np.array([self.processData(self.base[i]) for i in range(self.totalChannel)])
+            processed_data_p = np.array([self.processData(self.data_p[i]) for i in range(self.totalChannel)])
+            processed_base_p = np.array([self.processData(self.base_p[i]) for i in range(self.totalChannel)])
+
+            self.energy_metrix = processed_base - processed_data    # 16*16 np array. energy metrix [real time position] = energy
+            self.pos_metrix = processed_data_p - processed_base_p   # 16*16 np array. pos_metrix [real time position] = energy
+                                                                    # object down: pos_metrix > 0
+            last_mv_pos = self.last_mv_pos  # float=0, real time coordinate(self.r * x + y)
+            self.calDiff()  # produce self.diffs[totalChannel]
+            self.calPosDiff()   # produce self.diffs_p[totalChannel]
+
+            t = self.newest_move()  # attention: last_mv_pos updated; mv_energy updated.
+            if t != -1:
+                cur_mv_pos = t
+            else:
+                return False
+
+            # TODO: currently, we assert here's only one object on map
+                    # So self.mv_energy refers to object energy
+            #self.unknownPositionEnergy[cur_mv_pos] = self.mv_energy  # real-time center energy.
+
+            if self.object_filter(cur_mv_pos):    # obj DOWN
+                self.update_(cur_mv_pos)    # update min_energy, log ID-energy-position
+
+        else:
+            print("NOT start object recognized.")
+
 
 
         #self.lastData = copy.deepcopy(self.data)
         # print ("record took " +str(time.time()-start_time)+ "s")
         #self.calDiff()  # now we get diff[][]
-        self.calPosDiff()  # now we get diff[][]
+
 
         if self.calibration:
             self.calibration = False
         if self.recalibration:
             self.calibration = True
             self.recalibration = False
+        return True
+
+    def update_(self, cur_mv_pos):
+        """Update status after recognized new object
+
+
+        :return:
+        """
+        # log ID-energy, ID-position
+        self.objectEnergy[self.index] = self.mv_energy  # TODO: self.mv_energy is avr(map energy), not object energy actually
+        self.action[self.index] = cur_mv_pos    # TODO: cur_mv_pos is change point center on map, not object actually
+
+        # update self.min_energy
+        if self.index == 0:
+            self.min_energy = self.mv_energy
+        elif self.mv_energy < self.min_energy:
+            self.min_energy = self.mv_energy
+
+        # update energy-base
+        self.base = copy.deepcopy(self.data)
+        print("                                            ACTION DOWN INDEX " + str(self.index) + ' energy ' + str(
+            self.mv_energy))
+
+        # TODO: recognize object from points
+        #p_list = [i * 10 for i in self.point_set]
+        #self.point_poly_fill(p_list)
+
+
+        # TODO: track
+        # self.track[self.index] = "track object[" + str(self.index) + "]:"
+
+        # update index, last_down_data
+        self.index += 1
+        # self.last_down_data = realtime_data   # TODO: what's the use?
+        self.last_mv_pos = cur_mv_pos
 
 
     def newest_move(self):
-        """Log the last movement on the cloth
+        """Log the last movement(16*y + x) on the cloth
+
         When something new is placed on the cloth,
         select meaningful points with value and get center point, equivalent energy.
         :returns: current moving point energy
         """
-        points = np.zeros(MAX_DRAW_POINT * 2, np.int32)  # each point has 2 values: x and y.
-        # To get max energy on the cloth
-        max_energy = 0
-        single_point_energy = []
-        area_threshold = 0
-        for i in range(self.r):
-            for j in range(self.c):
-                temp = self.energy_metrix[i * self.r + j]
-                if temp > max_energy:
-                    max_energy = temp
-                    area_threshold = AREA_PERCENT * max_energy
+        points = np.zeros(MAX_DRAW_POINT * 2, np.int32)  # (list)each point has 2 values: x and y.
+        # To get max energy of position on the cloth
+        single_point_energy = []    # (list) load mode energy of useful positions, in seq
 
+        # for i in range(self.r):
+        #     for j in range(self.c):
+        #         temp = self.diffs_p[i * self.r + j]
+        #         if temp > max_energy:
+        #             max_energy = temp
+
+        max_energy = max(self.diffs_p)
+        area_threshold = AREA_PERCENT * max_energy
         count = 0  # number of processed points
+
         # Produce a selection of points to draw soon
         for i in range(self.r):
             for j in range(self.c):
                 # Draw the point on canvas only when it's close to max_energy, thus noise is away.
-                temp = self.energy_metrix[i * self.r + j]
+                temp = self.diffs_p[i * self.r + j]
                 if temp > 0 and temp > area_threshold:
-                    points[count] = int(i)
+                    points[count] = int(j)  # x
                     # print("Points[{}] = {}".format(count,points[count]))
                     count += 1
-                    points[count] = int(j)
+                    points[count] = int(i)  # y
                     count += 1
-                    single_point_energy.append(temp)
+                    temp_point_energy = self.diffs[i * self.r + j]
+                    # print("Temp point energy: {}".format(temp_point_energy))
+                    single_point_energy.append(temp_point_energy)
 
-        if count == 0:  # No signal at the moment
-            # print("No point generated.")
+        if count == 0:  # No useful posint at the moment
+            print("No useful point generated.")
             return 0
-        self.point_set = points[0: count]  # remove extra empty points, pass values of point_set to function drawShape
+        self.point_set = points[0: count]  # (list)remove extra empty points, pass values of point_set to function drawShape
+        # to draw shape, just use self.point_set
+
         # Calculate position and energy for capacity_center
         energy_sum = 0
         x_coordinate_energy_sum = 0
@@ -260,24 +332,39 @@ class FetchData:
             energy_sum += single_point_energy[i // 2]  # energy of the whole area
             x_coordinate_energy_sum += self.point_set[i] * single_point_energy[i // 2]
             y_coordinate_energy_sum += self.point_set[i + 1] * single_point_energy[i // 2]
+        # print("energy_sum: {}".format(energy_sum))
+        if energy_sum == 0:
+            return -1
+
         x_center = x_coordinate_energy_sum / energy_sum
+        print("x_center: {}".format(x_center + 1))
         y_center = y_coordinate_energy_sum / energy_sum
+        print("y_center: {}".format(y_center + 1))
         center_energy = energy_sum / (count // 2)
         #print('x_center is {}, y_center is {}, center_energy is {}'.format(x_center, y_center, center_energy))
-        mv_cooridinate = int(x_center * self.r + y_center)
-        self.mv_energy = center_energy
+        mv_cooridinate = int(y_center * self.r + x_center)
+        self.mv_energy = center_energy  # (float) equivalent energy of one point
+        print("center point energy: {}".format(center_energy))
         self.last_mv_pos = mv_cooridinate
         return mv_cooridinate
 
-    def object_filter(self, last_mv_pos, cur_mv_pos):
+    def object_filter(self, cur_mv_pos):
+        """Only when position and energy changed at the same time, return True
+
+        :param cur_mv_pos:
+        :return: True / False
+        """
+        map_energy = np.mean(self.energy_metrix)    # float, avr energy of real-time map
+        last_mv_pos = self.last_mv_pos
         t = abs(cur_mv_pos - last_mv_pos)
         if t < last_mv_pos // 24:
-            # print("cur {} - last {} = {} Noise ignored.".format(cur_mv_pos, last_mv_pos, cur_mv_pos - last_mv_pos))
+            print("cur {} - last {} = {} Noise ignored.".format(cur_mv_pos, last_mv_pos, cur_mv_pos - last_mv_pos))
             return False    # noise
-        else:
-            # print("cur {} - last {} = {} Real object detected.".format(cur_mv_pos, last_mv_pos, cur_mv_pos - last_mv_pos))
+        elif map_energy > ACTION_ENERGY_THRESHOLD:
+            print("cur {} - last {} = {} Real object detected.".format(cur_mv_pos, last_mv_pos, cur_mv_pos - last_mv_pos))
             return True
-
+        else:
+            return False
 
 
     def drawShape(self):
@@ -411,34 +498,43 @@ class FetchData:
             processed_data = self.processData(self.data[i])
             processed_base = self.processData(self.base[i])
             diff = processed_data - processed_base
-            if (diff > 0):
-                # self.base[i] = [processed_base]*WINDOW_SIZE
-                diff = 0
-            else:
-                diff = abs(diff)
-            #                print("diff")
-            #                print(diff)
-            self.diffs[i] = diff
+            # if (diff > 0):
+            #     # self.base[i] = [processed_base]*WINDOW_SIZE
+            #     diff = 0
+            # else:
+            #     diff = abs(diff)
+            self.diffs[i] = abs(diff)   # TODO: recg >0? <0?
+        print("diff")
+        print(self.diffs)
 
     def calPosDiff(self):
-        """Calculate diffs[][]
+        """Calculate diffs_p[]
+
+        with object on, diffs_p > 0
         """
         for i in range(self.totalChannel):
             processed_data_p = self.processData(self.data_p[i])
             processed_base_p = self.processData(self.base_p[i])
             diff = processed_data_p - processed_base_p
             self.diffs_p[i] = diff
-
+        print("diffs_p")
+        print(self.diffs_p)
+        '''
+        print("Check value of transmission mode data&base.")
         for i in range(self.r):
             for j in range(self.c):
                 print(str(self.processData(self.data_p[i*self.r + j])) + "-" + str(self.processData(self.base_p[i*self.r + j])), end="  ")
             print("\n")
-        #print("data " + str(processed_data_p) + " - base: " + str(processed_base_p) + " = " + str(diff))
+        '''
 
-    def calPosition(self):
-        print("Diffs: ")
-        for i in range(self.totalChannel):
-            print(self.diffs[i])
+    # def calPosition(self):
+    #     """Print diffs
+    #
+    #     :return:
+    #     """
+    #     print("Diffs: ")
+    #     for i in range(self.totalChannel):
+    #         print(self.diffs[i])
 
     def returnCalDiff(self):
         for i in range(self.totalChannel):
