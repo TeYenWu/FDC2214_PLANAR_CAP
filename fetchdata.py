@@ -10,26 +10,26 @@ import threading
 import serial.tools.list_ports
 import serial
 import numpy as np
-import matplotlib
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-import matplotlib.rcsetup as rcsetup
+# import matplotlib
+# import matplotlib.pyplot as plt
+# from mpl_toolkits.mplot3d import Axes3D
+# import matplotlib.rcsetup as rcsetup
 import math
 import os
 import copy
 import cv2
-from sklearn.neighbors import NearestNeighbors
+# from sklearn.neighbors import NearestNeighbors
 # import feature_extraction8
-from sklearn import preprocessing
-from sklearn.externals import joblib
-from painter import *
+# from sklearn import preprocessing
+# from sklearn.externals import joblib
+# from painter import *
 # For W & R CSV file
 import csv
 import random
 import time
 
-matplotlib.use('TkAgg')
-print(rcsetup.all_backends)
+# matplotlib.use('TkAgg')
+# print(rcsetup.all_backend s)
 INTERNAL_MUX_MODE = 0
 EXTERNAL_MUX_MODE = 1
 WINDOW_SIZE = 10
@@ -41,7 +41,7 @@ CAP_DECREASE_PEAK = 100000
 
 NON_NOISE_THRESHOLD = 10000
 SINGLE_CAP_THRESHOLD = 5000000
-ARDUINO_SERIAL_PORT = "COM5"
+ARDUINO_SERIAL_PORT = "COM4"
 
 CHANELL = 4
 SUPPORTED_ACTION_NUM = 100
@@ -66,6 +66,7 @@ def serialRead():
             # print (d[-1])
             serialDict.append(a)
             serialNum += 1
+    print("Serial Read Success.")
     return serialNum, serialDict
 
 
@@ -76,20 +77,22 @@ class FetchData:
         self.mysocket.bind(('localhost', 5000))
         self.mysocket.listen(1)
         self.conn = None
-        self.r = 16
-        self.c = 16
+        self.r = 8
+        self.c = 8
         self.recalibration = False
         self.calibration = True
         self.totalChannel = self.r * self.c
         self.data = np.zeros((self.totalChannel, WINDOW_SIZE))
         self.base = np.zeros((self.totalChannel, WINDOW_SIZE))
         self.data_p = np.zeros((self.totalChannel, WINDOW_SIZE))
+        self.base_p = np.zeros((self.totalChannel, WINDOW_SIZE))
 
         # self.cur = np.zeros((self.layer, self.totalChannel, WINDOW_SIZE))
         # self.chg = np.zeros((self.layer, self.totalChannel, WINDOW_SIZE))
         self.index = 0
         self.action = np.zeros((SUPPORTED_ACTION_NUM))
         self.energy_metrix = np.zeros((self.r, self.c))
+        self.pos_metrix = np.zeros((self.r, self.c))
 
         self.position = np.zeros((SUPPORTED_ACTION_NUM))  # the current poition(X*self.r+Y) of object(index)
         self.unknownPositionEnergy = np.zeros((self.r * self.c))
@@ -107,15 +110,30 @@ class FetchData:
         self.last_mv_pos = 0
         self.v_time = 0
 
-        self.arduino_port = serial.Serial(port=ARDUINO_SERIAL_PORT, baudrate=250000)
-        self.arduino_port.reset_input_buffer()
         # time.sleep(1)
         self.start_object_recog = False
-        self.arduino_port.dsrdtr = 0
+        self.diffs_p = np.zeros((self.totalChannel))
+
         # time.sleep(1)
         self.reset()
-        print(self.arduino_port.readline())  # b'FDC SETTING\r\n'
-        print(self.arduino_port.readline())  # b'Sensor Start\r\n'
+
+        is_setup = False
+        while not is_setup:
+            try:
+                self.arduino_port = serial.Serial(port=ARDUINO_SERIAL_PORT, baudrate=115200)
+                is_setup = True
+            except Exception as e:
+                print(e)
+                print("Wait for device")
+        is_setup = False
+        while not is_setup:
+            self.arduino_port.reset_input_buffer()
+            self.arduino_port.dsrdtr = 0
+            # self.arduino_port.write("reset\n".encode())
+            string_ = self.arduino_port.readline()
+            print(string_)
+            is_setup = "SUCCESS" in str(string_)
+            print("Wait for setup")
         print('build successful')
 
     def socket_handler(self):
@@ -146,156 +164,57 @@ class FetchData:
         """
         while 1:
             self.fetch_ch_data()
-            ch = []
-            rawch = []
-
+            pos = []
             for i in range(self.r * self.c):
-                diff = self.diffs[i]
-                if diff < 0:
-                    if abs(diff) < CONDUCTIVE_THRESHOLD:
-                        ch.append(diff/self.nonConductivePeak[i])
-                    else:
-                        ch.append(-diff/self.conductivePeak[i])
+                diff = self.diffs_p[i]
+                if diff > 0:
+                    pos.append(diff / 300)
                 else:
-                    ch.append(diff/self.capDecreasePeak[i])
+                    pos.append(diff / 300)
 
             if self.conn:
                 try:
-                    self.conn.send((' '.join(str(e) for e in ch) + '\n').encode())
+                    self.conn.send((' '.join(str(e) for e in pos) + '\n').encode())
                 except:
                     self.conn.close()
                     self.conn = None
                     print("Connectioon broken")
-            # print("Base: " + ' '.join(str(e) for e in self.base[0]) + '\n')
-            # print("Data: " + ' '.join(str(e) for e in self.data[0]) + '\n')
-            # print("Low Peak: " + ' '.join(str(e) for e in self.nonConductivePeak) + '\n')
-            # print("Upper Peak: " + ' '.join(str(e) for e in self.capDecreasePeak) + '\n')
-            # print("Pre Deformed Data: " + ' '.join(str(e) for e in self.pre_deformed_data) + '\n')
-        # print("Value: " + ' '.join(str(e) for e in ch) + '\n')
-        # print("isConductive: " + ' '.join(str(e) for e in isConductive) +'\n')
-        # self.conn.send(' '.join(str(e) for e in rawch) + '\n')
-        # time.sleep(self.send_time)
+
 
 
     def fetch_ch_data(self):
         """Read signal from arduino_port, Calibrate them by substracting base. So we get diffs[][]
         """
-        #self.timingTrack()  # tracking the position history of object
-        # self.base = np.zeros((self.totalChannel, WINDOW_SIZE))
-        self.test = [0] * WINDOW_SIZE
-        start_time = time.time()
+        print("fetchData")
         result = self.arduino_port.readline().decode()
-        # print(("result"))
-        # print((result))
         result_arr = result.split(", ")
-        result_arr_load = result_arr[0:256]
-        result_arr_tran = result_arr[256:512]
-        # print("result_arr")
-        # print(result_arr)  # no increase
+        result_arr_load = result_arr[0:64]
+        result_arr_tran = result_arr[64:128]
 
         for i in range(self.r):
             for j in range(self.c):
                 # fill in self.data from zero to arduino_port
-                self.data[i * self.c + j][:-1] = self.data[i * self.c + j][1:]
-                self.data[i * self.c + j][-1] = int(float(result_arr_load[i * self.c + j]))
-                if self.calibration:
-                    self.base[i * self.c + j] = copy.deepcopy(self.data[i * self.c + j])
-
                 self.data_p[i * self.c + j][:-1] = self.data_p[i * self.c + j][1:]
                 self.data_p[i * self.c + j][-1] = int(float(result_arr_tran[i * self.c + j]))
-                print("self.data_p: {}".format(self.data_p))
+                if self.calibration:
+                    #self.base[i * self.c + j] = copy.deepcopy(self.data[i * self.c + j])
+                    self.base_p[i * self.c + j] = copy.deepcopy(self.data_p[i * self.c + j])
+
+        if self.start_object_recog==False:
+            print("NOT start object recog")
 
 
-        if self.start_object_recog:
-            processed_data = np.array([self.processData(self.data[i]) for i in range(self.totalChannel)])
-            processed_base = np.array([self.processData(self.base[i]) for i in range(self.totalChannel)])
-            self.energy_metrix = processed_base - processed_data  # 1*64,energy at the moment
-            # for i in self.energy_metrix:
-                # print("Energy_metix: {}".format(self.energy_metrix))
-            last_mv_pos = self.last_mv_pos
-            # print("last_mv_pos: {}".format(self.last_mv_pos))
-
-            cur_mv_pos = self.newest_move()     # last_mv_pos updated
-            # print("Current_mv_pos: {}".format(cur_mv_pos))
-
-            self.unknownPositionEnergy[cur_mv_pos] = self.mv_energy
-            cur_obj_energy = self.mv_energy
-            # print("unknownposition: ")
-            # print(self.unknownPositionEnergy)
-
-            #self.timingTrack()
-            realtime_base = np.mean(processed_base)
-            realtime_data = np.mean(processed_data)    # decrease with non-conductive
-            real_time_energy = realtime_base - realtime_data
-
-            if self.index == 0:
-                self.last_mv_pos = 0
-
-            # Object DOWN && not the noise
-            if cur_obj_energy > ACTION_ENERGY_THRESHOLD and self.object_filter(last_mv_pos, cur_mv_pos):
-                # add self.action[index], self.objectEnergy[index]
-                self.objectEnergy[self.index] = cur_obj_energy
-                self.action[self.index] = cur_mv_pos
-
-                # update value of min_energy
-                if self.index == 0:
-                    self.min_energy = cur_obj_energy
-                elif cur_obj_energy < self.min_energy:
-                    self.min_energy = cur_obj_energy
-
-                # update base, index, last_down_data
-                self.base = copy.deepcopy(self.data)
-                print("                                            ACTION DOWN INDEX " + str(self.index) + ' energy ' + str(cur_obj_energy))
-                p_list = [i * 10 for i in self.point_set]
-                self.point_poly_fill(p_list)
-                # self.calPosition()
-                self.track[self.index] = "track object[" + str(self.index) + "]:"
-                self.index += 1
-                self.last_down_data = realtime_data
-                self.last_mv_pos = cur_mv_pos
-
-            elif ((realtime_data - self.last_down_data) - self.min_energy) > 0:  # Object UP
-                for i in range(self.index):
-                    if self.action[i] > 0:
-                        # print("action[index]>0 detected.")
-                        # object_energy = self.calculateEnergy(self.objectEnergy[self.index][k])
-                        object_energy = np.mean(self.objectEnergy[i])  # energy of object i
-                        # print("energy of object  "+str(i)+" is  " + str(object_energy))
-                        # OBJECT_ENERGY_THRESHOLD: # True when things REALLY go UP
-                        if abs(abs(realtime_data - self.last_down_data) - abs(object_energy)) < abs(object_energy) * 2:
-                            self.unknownPositionEnergy[int(self.action[i])] = 0
-                            self.action[i] = 0
-                            # self.index += 1
-                            self.base = copy.deepcopy(self.data)
-                            print("                                            ACTION UP INDEX" + str(i))
-                            self.last_mv_pos = 0
-                            break
-
-            # for i in range(self.totalChannel):
-            #     before_data = self.cur[k][i]
-            #     changed_data = self.chg[k][i]
-            #     self.objectEnergy[self.index][k][i] = changed_data - before_data
-            # bias[index][k][i] = 0
-        # print("Bias: ")
-        # print(self.objectEnergy[self.index])
-
-        self.lastData = copy.deepcopy(self.data)
+        #self.lastData = copy.deepcopy(self.data)
         # print ("record took " +str(time.time()-start_time)+ "s")
-        self.calDiff()  # now we get diff[][]
-        # self.recgMaterial()  # TODO cancel #
+        #self.calDiff()  # now we get diff[][]
+        self.calPosDiff()  # now we get diff[][]
 
-        # self.adjustPeak()
-        # self.scaleDiff()
-        # self.cancelSingleCap2() # self.cancelSingleCap()
         if self.calibration:
             self.calibration = False
         if self.recalibration:
             self.calibration = True
             self.recalibration = False
-        # time.sleep(0.01)
 
-        # print("record took " + str(time.time() - start_time) + "s")
-        # self.point_poly_fill(self.point_set)
 
     def newest_move(self):
         """Log the last movement on the cloth
@@ -501,6 +420,21 @@ class FetchData:
             #                print(diff)
             self.diffs[i] = diff
 
+    def calPosDiff(self):
+        """Calculate diffs[][]
+        """
+        for i in range(self.totalChannel):
+            processed_data_p = self.processData(self.data_p[i])
+            processed_base_p = self.processData(self.base_p[i])
+            diff = processed_data_p - processed_base_p
+            self.diffs_p[i] = diff
+
+        for i in range(self.r):
+            for j in range(self.c):
+                print(str(self.processData(self.data_p[i*self.r + j])) + "-" + str(self.processData(self.base_p[i*self.r + j])), end="  ")
+            print("\n")
+        #print("data " + str(processed_data_p) + " - base: " + str(processed_base_p) + " = " + str(diff))
+
     def calPosition(self):
         print("Diffs: ")
         for i in range(self.totalChannel):
@@ -595,44 +529,18 @@ class FetchData:
         self.nonConductivePeak = np.ones((self.totalChannel)) * NON_CONDUCTIVE_PEAK
         self.conductivePeak = np.ones((self.totalChannel)) * CONDUCTIVE_PEAK
         self.capDecreasePeak = np.ones((self.totalChannel)) * CAP_DECREASE_PEAK
-        self.arduino_port.write("reset\n".encode())
         self.diffs = np.zeros((self.totalChannel))
         # self.pre_deformed_data = np.ones((self.totalChannel))
 
     def start(self):
-        # plt.ion()
-        # fig = plt.figure()
-
-        # self.test = [0]*WINDOW_SIZE
-        # ax = fig.add_subplot(111)
-        # ax.autoscale(enable=True, axis='y', tight=True)
-        # ax.set_xlim([0, 10])
-        # ax.set_ylim([26100000, 26400000])
-        # line1, = ax.plot(list(range(WINDOW_SIZE)), self.test, 'r-') # Returns a tuple of line objects, thus the comma
-
-        # t = threading.Thread(target=self.sender, name="sender", args=())
-        # t.daemon = True
-        # t.start()
         t1 = threading.Thread(target=self.socket_handler, name="socket", args=())
         t1.daemon = True
         t1.start()
         self.sender()
-        # for msp in self.msps:
-        #     msp.start()
-        # try:
-        #     while True:
-        #         print(self.test)
-        #         line1.set_ydata(self.test)
-        #         fig.canvas.draw()
-        #         fig.canvas.flush_events()
-        #         ax3.set_ylim(min(self.test)-100000, max(self.test)+100000)
-        #         time.sleep(0.15)
-        # except KeyboardInterrupt:
-        #     exit()
 
 
 if __name__ == '__main__':
-    serialRead()
+    print(serialRead())
     # MSPComm("/dev/cu.usbmodem14141", "Test")
     fetchdata = FetchData()
     fetchdata.start()

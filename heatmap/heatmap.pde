@@ -8,8 +8,8 @@ Client myClient;
 int dataIn; 
 
 Serial myPort;        // The serial port
-int r = 16;         // horizontal position of the graph
-int c = 16;
+int r = 8;         // horizontal position of the graph
+int c = 8;
 int layer = 1;
 
 float values[][] = new float[layer][r*c];
@@ -131,18 +131,18 @@ void fillHeatMap(){
   loadPixels();
   for (int k = 0; k < layer; k++){
     float interp_array[][] = bilinearInterpolation(values[k]);
-    float max_positive = 0;
-    float max_negative = 0;
-    for(int y=0; y < cellSize*r; y++){
-      for(int x = 0; x < cellSize*c; x++){
-        if((interp_array[y][x] > 0) && (max_positive < interp_array[y][x])){
-          max_positive = interp_array[y][x];
-        }
-        if((interp_array[y][x] < 0) && (max_negative > interp_array[y][x])){
-          max_negative = interp_array[y][x];
-        }
-      }
-    }
+    float max_positive = 1;
+    float max_negative = -1;
+    //for(int y=0; y < cellSize*r; y++){
+    //  for(int x = 0; x < cellSize*c; x++){
+    //    if((interp_array[y][x] > 0) && (max_positive < interp_array[y][x])){
+    //      max_positive = interp_array[y][x];
+    //    }
+    //    if((interp_array[y][x] < 0) && (max_negative > interp_array[y][x])){
+    //      max_negative = interp_array[y][x];
+    //    }
+    //  }
+    //}
           
         
     for(int y=0; y < cellSize*r; y++){
@@ -152,7 +152,7 @@ void fillHeatMap(){
             if(interp_array[y][x]<0){
              interp_values[y*width+x+k*heatMapGap] = int(-interp_array[y][x]*255);
               c = getGrayGradientColor(interp_array[y][x], max_negative);
-            } else if(max_positive > 0.04 && interp_array[y][x]>max_positive * 0.8){
+            } else{ 
               c = getGradientColor(interp_array[y][x], max_positive);            
             }
             pixels[y*width+x+k*heatMapGap] = c;
