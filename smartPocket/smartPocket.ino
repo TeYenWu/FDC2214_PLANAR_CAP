@@ -1,21 +1,22 @@
 #include <Wire.h>
 #include "FDC2214.h"
 #include "AD5930.h"
-#include <ADC.h>
-#include <ADC_util.h>
+//#include <ADC.h>
+//#include <ADC_util.h>
 #define READ_PIN A9
 #define MODE_SWITCH_PIN 22
 #define ROW_NUM 16
 #define COLUMN_NUM 16
 #define MUXNUM 8
 #define REPEAT_COUNT 120
-int mux_control_pins[MUXNUM][3] = {{2, 1, 0}, {7, 6, 5}, {10, 9, 8}, {16, 17,  20}, {24, 25, 26}, {27, 28, 29},{30, 31, 32},{21, 12, 33}};
+//int mux_control_pins[MUXNUM][3] = {{2, 1, 0}, {7, 6, 5}, {10, 9, 8}, {16, 17,  20}, {24, 25, 26}, {27, 28, 29},{30, 31, 32},{21, 12, 33}};
+int mux_control_pins[8][3] = {{25, 27,23}, {31, 33,29}, {37, 39, 35}, {43, 45, 41}, {2, 3, 4}, {5,6,7}, {8,9,10}, {11,12,13}};
 FDC2214 capsense(FDC2214_I2C_ADDR_0); // Use FDC2214_I2C_ADDR_1 
 String inputString = "";         // a String to hold incoming data
 bool stringComplete = false;  // whether the string is complete
 
 float base[ROW_NUM*COLUMN_NUM] = {0};
-ADC *adc = new ADC(); // adc object
+//ADC *adc = new ADC(); // adc object
 volatile uint32_t adcValue[REPEAT_COUNT] = {0};
 volatile uint32_t num_iter = 0;
 bool isSuccessful = false;
@@ -52,12 +53,8 @@ void setup() {
 // ### set AD5930 and ADC
 //  Serial.println("SETTING AD5930 AND ADC"); 
   configAD5930();
-  adc->adc0->enableInterrupts(adc0_isr);
-  adc->adc0->setAveraging(1);
-  adc->adc0->setResolution(10);
-  adc->adc0->setConversionSpeed(ADC_settings::ADC_CONVERSION_SPEED::VERY_HIGH_SPEED); // change the conversion speed
-  adc->adc0->setSamplingSpeed(ADC_settings::ADC_SAMPLING_SPEED::VERY_HIGH_SPEED); // change the sampling speed
-  adc->adc0->wait_for_cal();
+  configADC();
+
 // Calculate Base
   for(int i = 0; i < ROW_NUM; i++){
       for(int j = 0; j < COLUMN_NUM; j++){
@@ -87,9 +84,13 @@ void setup() {
           base[i*COLUMN_NUM+j] = 0;
           for (int x = 0 ; x < 5; x++){
               num_iter = 0;
-              adc->adc0->startContinuous(READ_PIN);
-              while (num_iter<REPEAT_COUNT) {}
-              adc->adc0->stopContinuous();
+//              adc->adc0->startContinuous(READ_PIN);
+//              while (num_iter<REPEAT_COUNT) {}
+//              adc->adc0->stopContinuous();
+              for(int k=0; k < REPEAT_COUNT; k++){
+                while((ADC->ADC_ISR & 0x80)==0); // wait for conversion
+                adcValue[i]=ADC->ADC_CDR[7]; //get values
+              }
               for(int k = 0; k < REPEAT_COUNT; k++){
                   base[i*COLUMN_NUM+j] += adcValue[k];
               }
@@ -161,9 +162,13 @@ void loop() {
               
               toggleCtrlPin(); 
               delayMicroseconds(300);
-              adc->adc0->startContinuous(READ_PIN);
-              while (num_iter<REPEAT_COUNT) {}
-              adc->adc0->stopContinuous();
+//              adc->adc0->startContinuous(READ_PIN);
+//              while (num_iter<REPEAT_COUNT) {}
+//              adc->adc0->stopContinuous();
+                for(int k=0; k < REPEAT_COUNT; k++){
+                  while((ADC->ADC_ISR & 0x80)==0); // wait for conversion
+                  adcValue[i]=ADC->ADC_CDR[7]; //get values
+                }
               long rmsValue= 0;
               for(int k=0; k < REPEAT_COUNT; k++){
                 
@@ -207,16 +212,50 @@ void loop() {
 //  }
 }
 
-void adc0_isr(void) {
-    if(num_iter<REPEAT_COUNT) {
-      adcValue[num_iter] = (uint16_t)adc->adc0->analogReadContinuous();
-      num_iter++;
-    } else { // clear interrupt
-      adc->adc0->analogReadContinuous();
-    }
-    
-    //digitalWriteFast(LED_BUILTIN, !digitalReadFast(LED_BUILTIN));
+// DUE ADC
+void configADC(void){
+ 
+  PMC->PMC_PCER1 |= PMC_PCER1_PID37;                    // ADC power ON
+
+  ADC->ADC_CR = ADC_CR_SWRST;                           // Reset ADC
+  ADC->ADC_MR |= 0x80;  //set free running mode on ADC
+ ADC->ADC_CHER = 0x80; //enable ADC on pin A0
+
 }
+
+
+// DUE ADC HANDLER
+//void ADC_Handler () {
+//
+//  if(num_iter<REPEAT_COUNT) {
+//      adcValue[num_iter] = (uint16_t)ADC->ADC_CDR[7];
+//      num_iter++;
+//    }
+//}
+
+
+// TEENSY ADC
+//void configADC(void){
+//
+//    adc->adc0->enableInterrupts(adc0_isr);
+//  adc->adc0->setAveraging(1);
+//  adc->adc0->setResolution(10);
+//  adc->adc0->setConversionSpeed(ADC_settings::ADC_CONVERSION_SPEED::VERY_HIGH_SPEED); // change the conversion speed
+//  adc->adc0->setSamplingSpeed(ADC_settings::ADC_SAMPLING_SPEED::VERY_HIGH_SPEED); // change the sampling speed
+//  adc->adc0->wait_for_cal();
+//}
+
+// TEENSY ADC0
+//void adc0_isr(void) {
+//    if(num_iter<REPEAT_COUNT) {
+//      adcValue[num_iter] = (uint16_t)adc->adc0->analogReadContinuous();
+//      num_iter++;
+//    } else { // clear interrupt
+//      adc->adc0->analogReadContinuous();
+//    }
+//    
+//    //digitalWriteFast(LED_BUILTIN, !digitalReadFast(LED_BUILTIN));
+//}
 
 void serialEvent() {
 //  while (Serial.available()) {
