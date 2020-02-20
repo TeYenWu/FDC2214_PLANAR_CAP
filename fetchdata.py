@@ -168,9 +168,15 @@ class FetchData:
                 for i in range(self.r * self.c):
                     diff = self.diffs_p[i]
                     if diff > 0:
-                        pos.append(diff / 300)
+                        pos.append(diff / 40)
                     else:
-                        pos.append(diff / 300)
+                        pos.append(diff / 40)
+                for i in range(self.c * self.r):
+                    diff = self.diffs[i]
+                    if diff > 0:
+                        pos.append(diff / 402528)
+                    else:
+                        pos.append(diff / 402528)
 
                 if self.conn:
                     try:
@@ -179,9 +185,6 @@ class FetchData:
                         self.conn.close()
                         self.conn = None
                         print("Connectioon broken")
-
-
-
 
     def fetch_ch_data(self):
         """Read signal from arduino_port, Calibrate them by substracting base. So we get diffs[][]
@@ -219,19 +222,19 @@ class FetchData:
 
             t = self.newest_move()  # attention: last_mv_pos updated; mv_energy updated.
             if t != -1:
-                cur_mv_pos = t
-            else:
+                cur_mv_pos = t  # equivalent x_center + self.r * y_center
+            else:   # no noise nor object currently
                 return False
 
             # TODO: currently, we assert here's only one object on map
                     # So self.mv_energy refers to object energy
             #self.unknownPositionEnergy[cur_mv_pos] = self.mv_energy  # real-time center energy.
 
-            if self.object_filter(cur_mv_pos):    # obj DOWN
+            if self.object_filter(last_mv_pos, cur_mv_pos):    # obj DOWN
                 self.update_(cur_mv_pos)    # update min_energy, log ID-energy-position
 
         else:
-            print("NOT start object recognized.")
+            print(" :) Please press Reset on keyboard")
 
 
 
@@ -250,7 +253,17 @@ class FetchData:
     def update_(self, cur_mv_pos):
         """Update status after recognized new object
 
-
+        Update:
+                self.objectEnergy[self.index] = self.mv_energy
+                    Function: log ID - energy
+                self.action[self.index] = cur_mv_pos
+                    Function: log ID - position
+                float self.min_energy
+                    Function: log min( object energy )
+                np.array(self.r, self.c) self.base = self.data
+                    Function: update load-mode-base
+                self.index += 1
+                self.last_mv_pos = cur_mv_pos
         :return:
         """
         # log ID-energy, ID-position
@@ -283,27 +296,36 @@ class FetchData:
 
 
     def newest_move(self):
-        """Log the last movement(16*y + x) on the cloth
+        """Calculate whole image and get equivalent position & energy
 
-        When something new is placed on the cloth,
-        select meaningful points with value and get center point, equivalent energy.
-        :returns: current moving point energy
+        Scan (np[self.r*self.c])self.diffs_p to get need-to-draw points set
+                    save in self.point_set
+                            Type: list
+                            Contains: x1, y1, x2, y2, ...
+        From all need-to-draw points, calculate their
+                    x_center
+                            Type: float
+                    y_center
+                            Type: float
+                    self.mv_energy
+                            Type: float
+                            Meaning: center energy
+        Update self.last_mv_pos
+                    Type: float
+                    Value: self.r * y + x
+
+        :returns: self.r * y + x
+                    Type: float
         """
-        points = np.zeros(MAX_DRAW_POINT * 2, np.int32)  # (list)each point has 2 values: x and y.
+        points = np.zeros(MAX_DRAW_POINT * 2, np.int32)  # (np list)each point has 2 values: x and y.
         # To get max energy of position on the cloth
         single_point_energy = []    # (list) load mode energy of useful positions, in seq
-
-        # for i in range(self.r):
-        #     for j in range(self.c):
-        #         temp = self.diffs_p[i * self.r + j]
-        #         if temp > max_energy:
-        #             max_energy = temp
 
         max_energy = max(self.diffs_p)
         area_threshold = AREA_PERCENT * max_energy
         count = 0  # number of processed points
 
-        # Produce a selection of points to draw soon
+        # fetch need-to-draw points set
         for i in range(self.r):
             for j in range(self.c):
                 # Draw the point on canvas only when it's close to max_energy, thus noise is away.
@@ -348,16 +370,17 @@ class FetchData:
         self.last_mv_pos = mv_cooridinate
         return mv_cooridinate
 
-    def object_filter(self, cur_mv_pos):
+    def object_filter(self, last_mv_pos, cur_mv_pos):
         """Only when position and energy changed at the same time, return True
 
+        :param last_mv_pos:
         :param cur_mv_pos:
         :return: True / False
         """
         map_energy = np.mean(self.energy_metrix)    # float, avr energy of real-time map
-        last_mv_pos = self.last_mv_pos
         t = abs(cur_mv_pos - last_mv_pos)
-        if t < last_mv_pos // 24:
+
+        if t < 1 or t < last_mv_pos / self.r:
             print("cur {} - last {} = {} Noise ignored.".format(cur_mv_pos, last_mv_pos, cur_mv_pos - last_mv_pos))
             return False    # noise
         elif map_energy > ACTION_ENERGY_THRESHOLD:
@@ -504,8 +527,8 @@ class FetchData:
             # else:
             #     diff = abs(diff)
             self.diffs[i] = abs(diff)   # TODO: recg >0? <0?
-        print("diff")
-        print(self.diffs)
+        # print("diff")
+        # print(self.diffs)
 
     def calPosDiff(self):
         """Calculate diffs_p[]
@@ -517,8 +540,8 @@ class FetchData:
             processed_base_p = self.processData(self.base_p[i])
             diff = processed_data_p - processed_base_p
             self.diffs_p[i] = diff
-        print("diffs_p")
-        print(self.diffs_p)
+        # print("diffs_p")
+        # print(self.diffs_p)
         '''
         print("Check value of transmission mode data&base.")
         for i in range(self.r):
