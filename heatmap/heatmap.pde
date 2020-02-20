@@ -10,7 +10,7 @@ int dataIn;
 Serial myPort;        // The serial port
 int r = 8;         // horizontal position of the graph
 int c = 8;
-int layer = 1;
+int layer = 2;
 
 float values[][] = new float[layer][r*c];
 float graphRatio = 0.5;
@@ -28,7 +28,7 @@ color c_w = color(255,255,255);
 color c_b = color(0,0,0);
 BlobDetection theBlobDetection;
 int interp_values[] = new int[3000000];
-int heatMapGap = 350;
+int heatMapGap = 500;
 float diffValues[] = new float[r*c];
 
 void setup () {
@@ -44,9 +44,6 @@ void setup () {
   theBlobDetection = new BlobDetection(width, height);
   theBlobDetection.setPosDiscrimination(true);
   theBlobDetection.setThreshold(0.3f);
-  
-
-
 }
 
 void updateValues(){
@@ -54,8 +51,7 @@ void updateValues(){
     if (myClient.available() > 0) { 
       String rawdata = myClient.readStringUntil('\n');
       String[] data = rawdata.split(" ");
-      
-      
+ 
       print("Data: ");
       for (int k = 0; k < layer; k++){
           for (int i = 0; i < r * c; i++){
@@ -63,16 +59,11 @@ void updateValues(){
           //if(i%r <=low_cutoff || i/r <=low_cutoff) continue;
           values[k][i] =  (Float.valueOf(data[i+k * r * c].trim()));
           print(values[k][i]);
+          // trans-data: values[0]
+          // load-data: values[1]
           print(" ");
         }
       }
-      
-      //println("");
-      //rotateValues(values[1]);
-      // for (int i = 0; i < r * c; i++){
-      //     //diffValues[i] = abs(values[0][i]-values[1][i]);
-      //     diffValues[i] = abs(Float.valueOf(data[i+2 * r * c].trim()));
-      //  }
     }
   } else {
     println("server not found");
@@ -89,6 +80,7 @@ float[][] bilinearInterpolation(float[] values){
       }
   }
   
+  // draw on canvas
   for(int y=0; y < cellSize*r; y++){
     for(int x = 0; x < cellSize*c; x++){
           int y1 = (y + (cellSize/2))/cellSize * cellSize - cellSize/2;
@@ -132,19 +124,7 @@ void fillHeatMap(){
   for (int k = 0; k < layer; k++){
     float interp_array[][] = bilinearInterpolation(values[k]);
     float max_positive = 1;
-    float max_negative = -1;
-    //for(int y=0; y < cellSize*r; y++){
-    //  for(int x = 0; x < cellSize*c; x++){
-    //    if((interp_array[y][x] > 0) && (max_positive < interp_array[y][x])){
-    //      max_positive = interp_array[y][x];
-    //    }
-    //    if((interp_array[y][x] < 0) && (max_negative > interp_array[y][x])){
-    //      max_negative = interp_array[y][x];
-    //    }
-    //  }
-    //}
-          
-        
+    float max_negative = -1;         
     for(int y=0; y < cellSize*r; y++){
       for(int x = 0; x < cellSize*c; x++){
             color c =  color(0,0,0);
@@ -155,7 +135,7 @@ void fillHeatMap(){
             } else{ 
               c = getGradientColor(interp_array[y][x], max_positive);            
             }
-            pixels[y*width+x+k*heatMapGap] = c;
+            pixels[y*width+x+k*heatMapGap] = c;  // set color 
       }
     }
   }
