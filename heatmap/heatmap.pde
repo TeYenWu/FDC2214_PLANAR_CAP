@@ -162,7 +162,10 @@ void fillHeatMap(){
 void keyPressed() {
   if (key == 'r' || key == 'R') {
     myClient.write("reset\n");
-  } 
+  }
+  else if (key == 'l' || key == 'L'){
+    myClient.write("log\n");
+  }
 }
 
 
