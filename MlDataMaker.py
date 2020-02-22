@@ -86,6 +86,10 @@ class FetchData:
         self.data_p = np.zeros((self.totalChannel, WINDOW_SIZE))
         self.base_p = np.zeros((self.totalChannel, WINDOW_SIZE))
 
+        self.object_set = ["greenHead", "redTweezers", "blackTweezers"]#, "orange", "apple", "whitePen",  "blackPen",
+                           #"", "", "", "", "", "", "", "", "", ""}
+        self.trainNumber = 10
+        self.trainCount = 0
 
         # self.cur = np.zeros((self.layer, self.totalChannel, WINDOW_SIZE))
         # self.chg = np.zeros((self.layer, self.totalChannel, WINDOW_SIZE))
@@ -98,7 +102,7 @@ class FetchData:
         self.unknownPositionEnergy = np.zeros((self.r * self.c))
         # self.move = np.zeros((SUPPORTED_ACTION_NUM))  # if the position stays unchanged, move = false, else true
         self.track = np.array(self.position, dtype=np.str)  # the position history of object(index)
-        
+
         self.lastData = np.zeros((self.totalChannel, WINDOW_SIZE))
         self.objectEnergy = np.zeros((SUPPORTED_ACTION_NUM, self.totalChannel))
         self.min_energy = 0
@@ -151,7 +155,7 @@ class FetchData:
                         self.start_object_recog = True
                     elif d.strip() == "log":    # L-key on keyboard is pressed
                         print("             log")
-                        self.fetch_ml_data()
+                        self.fetch_ml_data(self.object_set[self.trainCount//self.trainNumber])
 
             else:
                 self.conn, addr = self.mysocket.accept()
@@ -211,10 +215,9 @@ class FetchData:
             self.recalibration = False
         return True
 
-    def fetch_ml_data(self):
+    def fetch_ml_data(self, name):
         #name = input('type object name to log data above')
         #print(name)
-        name = "alcohol"
         data_list = []
         # for obj in objs.names:
         print('target data: ' + name)
@@ -247,13 +250,18 @@ class FetchData:
 
 
         cwd = os.getcwd()  # current working dictionary
-        filename = cwd + '\\coil\\data\\' + str(name) + '.csv'
+        filename = cwd + '\\coil\\data\\' + 'c' + str(self.trainCount//self.trainNumber) + '.csv'
         print("Filename: {}".format(filename))
         f = open(filename, mode='a+', encoding='utf-8')
         for line in data_list:
             f.write(line)
         f.close()
         print('writen to file ' + filename)
+
+        self.trainCount += 1
+        if self.trainCount % self.trainNumber == 0:
+            print("\n start data collection of the next object \n")
+
 
     def fetch_arduino_data(self):
         result = self.arduino_port.readline().decode()
