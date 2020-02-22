@@ -351,7 +351,7 @@ class FetchData:
             if diff < 0:
                 self.diffs[i] = -diff  # TODO: recg >0? <0?
             else:
-                self.diffs[i] = diff
+                self.diffs[i] = 0
 
         # for i in range(self.r):
         #     for j in range(self.c):
@@ -377,7 +377,10 @@ class FetchData:
             processed_data_p = self.processData(self.data_p[i])
             processed_base_p = self.processData(self.base_p[i])
             diff = processed_data_p - processed_base_p
-            self.diffs_p[i] = diff
+            if diff > 0:
+                self.diffs_p[i] = diff
+            else:
+                self.diffs_p[i] = 0
         '''
         print("Check value of transmission mode data&base.")
         for i in range(self.r):
