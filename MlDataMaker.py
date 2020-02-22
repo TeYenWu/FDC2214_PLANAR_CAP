@@ -98,9 +98,7 @@ class FetchData:
         self.unknownPositionEnergy = np.zeros((self.r * self.c))
         # self.move = np.zeros((SUPPORTED_ACTION_NUM))  # if the position stays unchanged, move = false, else true
         self.track = np.array(self.position, dtype=np.str)  # the position history of object(index)
-        self.tempIndex = 0
-        # (用了下中文:> )循环中的i不是self对象的类变量，不能作为getCurrentPosition()函数的参数，所以建立用来临时传参的变量self.tempIndex表示目前遍历到的物体的索引值以返回这个物体的currentPosition
-
+        
         self.lastData = np.zeros((self.totalChannel, WINDOW_SIZE))
         self.objectEnergy = np.zeros((SUPPORTED_ACTION_NUM, self.totalChannel))
         self.min_energy = 0
@@ -279,7 +277,6 @@ class FetchData:
     def fetch_realtime_metrix(self):
         """From self.c*self.r*10 to self.c*self.r,
             so we get real time position metrix and energy metrix(self.c * self.r).
-
         :return:
         """
         processed_data = np.array([self.processData(self.data[i]) for i in range(self.totalChannel)])
@@ -367,7 +364,6 @@ class FetchData:
 
     def calPosDiff(self):
         """Calculate diffs_p[]
-
         with object on, diffs_p > 0
         """
         for i in range(self.totalChannel):
