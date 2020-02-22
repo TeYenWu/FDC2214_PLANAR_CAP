@@ -155,8 +155,6 @@ class FetchData:
                         print("             log")
                         self.fetch_ml_data()
 
-
-
             else:
                 self.conn, addr = self.mysocket.accept()
                 if self.conn:
@@ -218,7 +216,7 @@ class FetchData:
     def fetch_ml_data(self):
         #name = input('type object name to log data above')
         #print(name)
-        name = "indiansizetest02202131"
+        name = "alcohol"
         data_list = []
         # for obj in objs.names:
         print('target data: ' + name)
@@ -248,8 +246,7 @@ class FetchData:
         print(line)
         # line: str(participant) , data1[0,...i], base1[0,...i], peak1[0,...i], str(participant) + '\n'
         data_list.append(line)
-        line_length = 3 * len(data1)
-        data_list.append(str(line_length))
+
 
         cwd = os.getcwd()  # current working dictionary
         filename = cwd + '\\coil\\data\\' + str(name) + '.csv'
