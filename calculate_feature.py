@@ -18,14 +18,14 @@ from sklearn import preprocessing
 from sklearn.metrics import confusion_matrix
 import random
 
-
+TYPE_NUM = 3    # TODO: changed
 if __name__ == '__main__':
     print('calculate the features and store.')
 
-    objectNums = 8     # TODO: changed
-    trainDataNums = 10  # (line)number of samples for each object, origin: 30；
+    objectNums = TYPE_NUM
+    trainDataNums = 10  # (line)number of samples for each object, origin: 30；# TODO: changed
     coilNums = 64   # self.r * self.c
-    train_file_num = 8
+    train_file_num = TYPE_NUM
     cwd = os.getcwd()
 
     train_list = []  # save every samples' features here
@@ -35,8 +35,8 @@ if __name__ == '__main__':
     # for i in range(1,58):  # only use some kind of the objects to train and test.
     #     if i in(1,7,13,38,52,10,26,27,28,57,39,56,48,53,17,18,19,20,23):
     #         train_type.append(i)
-    for i in range(1, train_file_num + 1):
-        train_type.append(i)    # train_type: [1,2, ..., 19]
+    for i in range(0, train_file_num):
+        train_type.append(i)    # train_type: [0,1,2, ... ]
 
     count = 0
 
@@ -48,24 +48,20 @@ if __name__ == '__main__':
         filename = 'coil\\data\\c'+str(i)+'.csv'
         f = open(filename, 'r')
         for j in range(trainDataNums):  # scan all lines
-            data = []
-            base = []
-            peak = []
-            type = []
+            # data = []
+            # base = []
+            load_diff = []  # data
+            trans_diff = []  # base
 
             line = f.readline()
             iterms = line.strip('\n').split(',')
             # print("iterms[0]: {}, iterms[1]: {}".format(iterms[0], iterms[1]))
 
-            data = iterms[1:coilNums+1]
-            base = iterms[coilNums+1:2*coilNums+1]
-            peak = iterms[2*coilNums+1:3*coilNums]  # max diffs
+            load_diff = iterms[1:coilNums+1]
+            trans_diff = iterms[coilNums+1:2*coilNums+1]
 
-            # base = map(int, base)   # convert all base to type int
-            # data = map(int, data)
-            # peak = map(int, peak)
             # extract the features: 23 types of~
-            feature = feature_extraction8.feature_calculation(data, base, i, j)   # i-which file; j-which line
+            feature = feature_extraction8.feature_calculation(load_diff, trans_diff, i, j)   # i-which file; j-which line
             # print("feature: {}".format(feature))
 
             train_list.append(feature)  # one feature for each line
@@ -88,7 +84,7 @@ if __name__ == '__main__':
     f_feature.close()
 
     label_file = cwd + '\\coil\\data\\' + 'label.csv'
-    f_label = open(label_file, 'w') # cover write
+    f_label = open(label_file, 'w')  # cover write
     current_line = ''
     for i in label_list:
         current_line += str(i)+','
