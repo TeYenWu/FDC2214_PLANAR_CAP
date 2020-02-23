@@ -86,8 +86,8 @@ class FetchData:
         self.data_p = np.zeros((self.totalChannel, WINDOW_SIZE))
         self.base_p = np.zeros((self.totalChannel, WINDOW_SIZE))
 
-        self.object_set = ["greenHead", "redTweezers", "blackTweezers"]#, "orange", "apple", "whitePen",  "blackPen",
-                           #"", "", "", "", "", "", "", "", "", ""}
+        self.object_set = ["greenHead", "orange", "apple"]  # "whitePen",  "blackPen","redTweezers", "blackTweezers"
+                           # "", "", "", "", "", "", "", "", "", ""}
         self.trainNumber = 10
         self.trainCount = 0
 
@@ -177,14 +177,14 @@ class FetchData:
                 for i in range(self.r * self.c):
                     diff = self.diffs_p[i]
                     if diff > 0:
-                        pos.append(diff / 40)
+                        pos.append(diff / 40)   # make sense
                     else:
                         pos.append(diff / 40)
                 # load mode
                 for i in range(self.c * self.r):
                     diff = self.diffs[i]
                     if diff > 0:
-                        pos.append(diff / 402528)
+                        pos.append(diff / 402528)   # make sense
                     else:
                         pos.append(diff / 402528)
 
@@ -227,27 +227,23 @@ class FetchData:
         # input('press ENTER to begin trial {} >>'.format(i))  # Read directly from console, returns string.
         #input('press ENTER to begin trial >>')  # Read directly from console, returns string.
         # data, base = self.fetch_ch_data()
-        peak = self.peak  # list[self.r * self.c]
-        data1, base1, peak1 = [], [], []
+        # peak = self.peak  # list[self.r * self.c]
+        data1, base1 = [], []
         for j in range(len(self.ml_data)):
             data1.append(self.ml_data[j])
             base1.append(self.ml_base[j])
-            peak1.append(self.peak[j])
 
         line = str(name) + ','
         for d in data1:
             line += str(d) + ','
         for b in base1:
             line += str(b) + ','
-        for pe in peak1:
-            line += str(pe) + ','
-        # line += str(OBJ().id[obj]) + '\n'
+
         line += str(name) + '\n'
         # print(str(i) + ': ' + line)
         print(line)
         # line: str(participant) , data1[0,...i], base1[0,...i], peak1[0,...i], str(participant) + '\n'
         data_list.append(line)
-
 
         cwd = os.getcwd()  # current working dictionary
         filename = cwd + '\\coil\\data\\' + 'c' + str(self.trainCount//self.trainNumber) + '.csv'
@@ -288,14 +284,16 @@ class FetchData:
         :return:
         """
         processed_data = np.array([self.processData(self.data[i]) for i in range(self.totalChannel)])
-        self.ml_data = processed_data.tolist()
+        # self.ml_data = processed_data.tolist()
         processed_base = np.array([self.processData(self.base[i]) for i in range(self.totalChannel)])
-        self.ml_base = processed_base.tolist()
+        # self.ml_base = processed_base.tolist()
         processed_data_p = np.array([self.processData(self.data_p[i]) for i in range(self.totalChannel)])
         processed_base_p = np.array([self.processData(self.base_p[i]) for i in range(self.totalChannel)])
-        self.energy_metrix = processed_base - processed_data    # 16*16 np array. energy metrix [real time position] = energy
-        self.pos_metrix = processed_data_p - processed_base_p   # 16*16 np array. pos_metrix [real time position] = energy
+        self.ml_data = self.energy_metrix = processed_base - processed_data    # 16*16 np array. energy metrix [real time position] = energy
+        self.ml_data = self.ml_data.tolist()
+        self.ml_base = self.pos_metrix = processed_data_p - processed_base_p   # 16*16 np array. pos_metrix [real time position] = energy
                                                                 # object down: pos_metrix > 0
+        self.ml_base = self.ml_base.tolist()
         # print("                 fetch_realtime_metrix  data - base; data_p - base_p")
 
     def processData(self, data):
