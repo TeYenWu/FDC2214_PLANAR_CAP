@@ -187,4 +187,122 @@ data for each Object |20
 - A litter better than load&transmission mode, whose top accuracy is 77.78. 79.44 > 77.78
 - Not as good as load-mode-only. 79.44 < 82.22
 
+### accuracy? remove -x to 0
+### Conclusion: 
+
+#### 20/02/23 22:39 
+| items        | energy   |
+| --------   | -----:  |
+| greenHead     | 0.27   |
+| orange        |  1.12   |
+| apple       |    0.8    |
+|airpodsBOX | 0.3-0.8|
+|airpods| 0.044|
+|halfwater | 0.3|
+|fullwater | 0.36|
+|tinyTomato|0.28-0.54|
+|tinyGrape | 0.36|
+
+Model  |time(s)| accuracy(%)
+------------- | -------------|------------
+SVM  | 0.03s|52.22
+NB  | 0.017| 52.22
+NN|0.026|40
+LR|0.05|51.11
+RF|0.97|**66.67**
+DT|0.03|52.22
+
+Object Num | 9
+------------- | -------------|
+data for each Object |10
+- top accuracy 66.67.Not as good as 77% when + & - exist.
+
+#### 20/02/23 22:42 
+| items        | energy   |
+| --------   | -----:  |
+| greenHead     | 0.27   |
+| orange        |  1.12   |
+| apple       |    0.8    |
+|airpodsBOX | 0.3-0.8|
+|airpods| 0.044|
+|halfwater | 0.3|
+|fullwater | 0.36|
+|tinyTomato|0.28-0.54|
+|tinyGrape | 0.36|
+
+Model  |time(s)| accuracy(%)
+------------- | -------------|------------
+SVM  | 0.01s|62.5
+NB  | 0.014|62.5
+NN|0.0189|60
+LR|0.024|62.5
+RF|0.88|**67.5**
+DT|0.01|65
+
+Object Num | 4
+------------- | -------------|
+data for each Object |10
+- top accuracy 67.5.Not as good as 77% when + & - exist.
+
+### accuracy? remove -x to 0 & both LOAD
+### Conclusion: 
+
+#### 20/02/23 22:39 
+| items        | energy   |
+| --------   | -----:  |
+| greenHead     | 0.27   |
+| orange        |  1.12   |
+| apple       |    0.8    |
+|airpodsBOX | 0.3-0.8|
+|airpods| 0.044|
+|halfwater | 0.3|
+|fullwater | 0.36|
+|tinyTomato|0.28-0.54|
+|tinyGrape | 0.36|
+
+Model  |time(s)| accuracy(%)
+------------- | -------------|------------
+SVM  | 0.03s|37.78
+NB  | 0.017| 43.33
+NN|0.026|41.11
+LR|0.05|41.11
+RF|0.97|**66.67**
+DT|0.03|52.56
+
+Object Num | 9
+------------- | -------------|
+data for each Object |10
+- almost no change with LOAD&TRANS = 66.67
+
+### accuracy? remove -x to 0 & both TRANS
+### Conclusion: 
+
+#### 20/02/23 22:39 
+| items        | energy   |
+| --------   | -----:  |
+| greenHead     | 0.27   |
+| orange        |  1.12   |
+| apple       |    0.8    |
+|airpodsBOX | 0.3-0.8|
+|airpods| 0.044|
+|halfwater | 0.3|
+|fullwater | 0.36|
+|tinyTomato|0.28-0.54|
+|tinyGrape | 0.36|
+
+Model  |time(s)| accuracy(%)
+------------- | -------------|------------
+SVM  | 0.043s|52.22
+NB  | 0.018|58.89
+NN|0.026|45.56
+LR|0.049|53.33
+RF|1.01|**72.22**
+DT|0.03|60
+
+Object Num | 9
+------------- | -------------|
+data for each Object |10
+- 72.22 tiny better than LOAD&TRANS( = 66.67)
+
+
 
