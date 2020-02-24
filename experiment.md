@@ -130,7 +130,7 @@ data for each Object |10
 - Conclusion: More data != better performance.
 
 ### accuracy? load mode V.S transmission mode?
-### Conclusion: Load-mode only is best.
+### Conclusion: Load > Tran > Load&Tran
 
 #### 20/02/23 21:45 LOAD mode ONLY
 | items        | energy   |
