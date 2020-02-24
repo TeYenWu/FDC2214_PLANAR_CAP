@@ -21,9 +21,17 @@ from sklearn.metrics import confusion_matrix
 import random
 from sklearn.externals import joblib
 import os
+# import warnings filter
+from warnings import simplefilter
+# ignore all future warnings
+simplefilter(action='ignore', category=FutureWarning)
 # 各种分类函数
 
+TYPE_NUM = 4    # todo: changed me to count(object)
+
 # SVM Classifier
+
+
 def svm_classifier():
     from sklearn.svm import SVC
     model = SVC(kernel='linear', C=1)
@@ -152,30 +160,30 @@ def plot_confusion_matrix(y_true, y_pred, labels, saveFileName, showFlag):
 if __name__ == '__main__':
     print('begin myclassifier')
 
-    objectNums = 8
+    objectNums = TYPE_NUM
     trainDataNums = 10
     coilNums = 64
 
     # Make train_list(float list) from file:features.csv
-    train_list=[]
-    label_list=[]
+    train_list = []
+    label_list = []
     cwd = os.getcwd()  # current working dictionary
     feature_file = cwd + '\\coil\\data\\' + 'features.csv'
-    f_feature=open(feature_file,'r')
-    lines=f_feature.readlines()
+    f_feature = open(feature_file, 'r')
+    lines = f_feature.readlines()
     for i in lines:
-        iterm_feature=i.strip('\n').split(',')
+        iterm_feature = i.strip('\n').split(',')
         for k in range(len(iterm_feature)):
-            iterm_feature[k]=float(iterm_feature[k])
+            iterm_feature[k] = float(iterm_feature[k])
         train_list.append(iterm_feature)
     f_feature.close()
     # Make label_list(int list) from file:label.csv
     label_file = cwd + '\\coil\\data\\' + 'label.csv'
-    f_label=open(label_file,'r')
-    line=f_label.readline()
-    iterm_label=line.strip('\n').split(',')
+    f_label = open(label_file, 'r')
+    line = f_label.readline()
+    iterm_label = line.strip('\n').split(',')
     for k in range(len(iterm_label)):
-        iterm_label[k]=int(iterm_label[k])
+        iterm_label[k] = int(iterm_label[k])
         label_list.append(iterm_label[k])
 
     # 打乱数据
@@ -202,14 +210,15 @@ if __name__ == '__main__':
 
     ## 使用不同分类方法对实验数据进行仿真
     misNumPerClass = {}  # 存储不同类别的各自错误数
-    classNum = 8  # 数据集的类别个数。需要根据
+    classNum = TYPE_NUM  # 数据集的类别个数。需要根据
     for i in range(1, classNum + 1, 1):
         misNumPerClass[i] = 0
     # KFoldNum存储交叉验证的次数。
     KFoldNum = 10
 
     # train and store a Random Forest classifier.
-    RF = RandomForestClassifier(n_estimators=100, max_features=7)
+    RF = RandomForestClassifier(n_estimators=100, max_features="auto")
+    x = np.nan_to_num(x)
     RF.fit(x, y)
     print(os.getcwd())
     joblib.dump(RF, 'RF2.model')

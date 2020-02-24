@@ -65,6 +65,7 @@ def feature_calculation(load_diff, trans_diff, imagename, imagename2):
     '''
     # delta_list = list(map(lambda x: int(float(x[0]))-int(float(x[1])), zip(base, data)))
     trans_diff = list(map(float, trans_diff))
+    # print("trans_diff line 68: {}".format(trans_diff))
     max_delta = max(trans_diff)
     # print("Trans_diff is {}".format(trans_diff))
     # print("Max = {}".format(max_delta))
@@ -78,10 +79,17 @@ def feature_calculation(load_diff, trans_diff, imagename, imagename2):
             t = t * 255
             if t > 255:
                 print("Caution!!!trans_diff = {}, max_delta = {}".format(trans_diff[i], max_delta))
-            ch.append(t)
+            if t > 255 * 0.1:
+                ch.append(t)
+            else:
+                ch.append(0)
             # print("delta {} / peak {} = ch {}".format(delta_data, peak[i], t))
     print("transmission mode diffs:")
-    print(ch)
+    for i in range(r):
+        for j in range(c):
+            print(ch[i*c + j], end=" ")
+        print("\n")
+    # print(ch)
     '''
     fill in np.array(coil_array[r][c]) with grey-scale map
     '''
@@ -98,6 +106,7 @@ def feature_calculation(load_diff, trans_diff, imagename, imagename2):
 
     # 1. LBP 0-35
     # local binary pattern
+    # update 02/24: filter noise position out of feature set
     LBP_features = mahotas.features.lbp(interp_array, 2, 8)  # 2-D numpy ndarray; radius; points
     for i in LBP_features:
         feature_set.append(i)
@@ -111,19 +120,19 @@ def feature_calculation(load_diff, trans_diff, imagename, imagename2):
 
     # 3. object_value 37-46
     mean_ten_section = means_for_each_part(object_value)
-    for i in mean_ten_section:
-        feature_set.append(i)
-    print("------3. energy mean of 10 sections:{}".format(mean_ten_section))
+    # for i in mean_ten_section:
+    #     feature_set.append(i)
+    print("------3. (del)energy mean of 10 sections:{}".format(mean_ten_section))
 
     # 4. numbers of edge  [47]
-    feature_set.append(edge_numbers)
-    print("------4. edge_numbers: {}".format(edge_numbers))
+    # feature_set.append(edge_numbers)
+    print("------4.(del) edge_numbers: {}".format(edge_numbers))
     # print "extracted 4 feature with" + str(time.time() - start_time)
 
     # 5.variance  [48]
     variance_pixel = np.var(object_value)
     feature_set.append(variance_pixel)
-    print("------5: viriance: {}".format(variance_pixel))
+    print("------5: variance: {}".format(variance_pixel))
     # print "extracted 5 feature with" + str(time.time() - start_time)
 
     # 6. ICP return the error of each training set value
@@ -168,7 +177,7 @@ def feature_calculation(load_diff, trans_diff, imagename, imagename2):
             if edge_array[y][x] == high:
                 average_edge_distance += math.sqrt((x-x_gravity)**2+(y-y_gravity)**2)/(1.0*edge_numbers)
     feature_set.append(average_edge_distance)
-    print("------9: average of EDGE pixels to ENERGY center: {}".format(average_edge_distance))     # todo: why always zero
+    # print("------9: average of EDGE pixels to ENERGY center: {}".format(average_edge_distance))     # todo: why always zero
     # print "extracted 11 feature with" + str(time.time() - start_time)
 
     # 10. average distance from each points to geometry point
@@ -227,8 +236,8 @@ def feature_calculation(load_diff, trans_diff, imagename, imagename2):
             if load_diff[y*rows + x] == high:
                 if load_diff[y*rows + x] >= load_diff[(y-1)*rows + x] and load_diff[y*rows + x] >= load_diff[y*rows+x-1] and load_diff[y*rows+x] >= load_diff[(y-1)*rows+x-1] and load_diff[y*rows+x] >= load_diff[(y+1)*rows+x] and load_diff[y*rows+x] >= load_diff[y*rows+x+1] and load_diff[y*rows+x] >= load_diff[(y-1)*rows+x+1] and load_diff[y*rows+x]>=load_diff[(y+1)*rows+x-1] and load_diff[y*rows+x]>=load_diff[(y+1)*rows+x+1]:
                     extremum_nums += 1
-    feature_set.append(extremum_nums)
-    print("------15: local max energy counts:{}".format(extremum_nums))     # TODO:why always zero?
+    # feature_set.append(extremum_nums)
+    print("------15:(del)local max energy counts:{}".format(extremum_nums))     # TODO:why always zero?
     # print "extracted 12 feature with" + str(time.time() - start_time)
 
     # 16. median value of object
@@ -265,6 +274,7 @@ def feature_calculation(load_diff, trans_diff, imagename, imagename2):
     # feature_set.append(tsfresh.feature_extraction.feature_calculators.approximate_entropy(object_value,50,1))
 
     # 23 absolute energy of OBJECT pixel
+    #  sum over the squared values
     abs_energy = tsfresh.feature_extraction.feature_calculators.abs_energy(object_value)
     feature_set.append(abs_energy)
     print("------23: abs_energy:{}".format(abs_energy))
@@ -274,13 +284,13 @@ def feature_calculation(load_diff, trans_diff, imagename, imagename2):
 
 
 def means_for_each_part(array_value):
-    print("object_value: {}".format(array_value))
+    # print("object_value: {}".format(array_value))
     global r, c, channal, t, rows, cols, high, low, object_pixel, object_value, mean_ten_section
     global tempthreshold, coil_array, interp_array, binary_array, edge_array, edge_numbers
     array_value.sort()  # from small to big
     means = []
-    step = len(array_value)/10  # todo: decrease 10 to ? so that no nan would exsist
-    for i in range(9):
+    step = len(array_value)/3  # todo: decrease 10 to ? so that no nan would exsist
+    for i in range(2):
         means.append(np.mean(array_value[int(i*step):int((i+1)*step)]))
         # print("Values: {}".format(array_value[int(i*step):int((i+1)*step)]))
     means.append(np.mean(array_value[int(9*step):]))
@@ -288,6 +298,7 @@ def means_for_each_part(array_value):
 
 
 def count_for_each_part(array_value):
+    # print("line 300 object_value: {}".format(array_value))
     # print("object_value: {}".format(array_value))
     global r, c, channal, t, rows, cols, high, low, object_pixel, object_value, mean_ten_section
     global tempthreshold, coil_array, interp_array, binary_array, edge_array, edge_numbers
@@ -309,8 +320,9 @@ def bilinear_interpolation(load_diff):
     for y in range(rows):
         for x in range(cols):
             interp_array[y][x] = coil_array[y][x]
-            if interp_array[y][x] > tempthreshold:  # position proof
+            if interp_array[y][x] > 10:  # position proof
                 object_value.append(load_diff[y * rows + x])  # energy of the point
+    print("object_value: {}".format(object_value))
 
             # if interp_array[y][x] == 255.0:  # new coming features
             #     value_section[9] += 1  # TODO:what's value_section[]
@@ -327,11 +339,13 @@ def binary_image():
 
     for y in range(rows):
         for x in range(cols):
-            if interp_array[y][x] < tempthreshold:
-                binary_array[y][x] = low
-            else:
+            #if interp_array[y][x] < tempthreshold:
+            if interp_array[y][x] > 10:
                 binary_array[y][x] = high
                 object_pixel += 1
+            else:
+                binary_array[y][x] = low
+
                 #print object_pixel
     # print("object_pixel:{}".format(object_pixel))
 

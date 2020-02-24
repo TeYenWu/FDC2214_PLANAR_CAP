@@ -86,9 +86,9 @@ class FetchData:
         self.data_p = np.zeros((self.totalChannel, WINDOW_SIZE))
         self.base_p = np.zeros((self.totalChannel, WINDOW_SIZE))
 
-        self.object_set = ["greenHead", "orange", "apple"]  # "whitePen",  "blackPen","redTweezers", "blackTweezers"
-                           # "", "", "", "", "", "", "", "", "", ""}
-        self.trainNumber = 10
+        #self.object_set = ["greenHead", "orange", "apple", "airpodsBOX", "airpods", "halfwater", "fullwater", "tinyTomato", "tinyGrape"]  # "blackTweezers","greenHead", "orange", "apple","airpods", "halfwater", "fullwater"
+        self.object_set = ["orange", "apple", "tinytoy", "airpods"]
+        self.trainNumber = 20
         self.trainCount = 0
 
         # self.cur = np.zeros((self.layer, self.totalChannel, WINDOW_SIZE))
@@ -177,14 +177,14 @@ class FetchData:
                 for i in range(self.r * self.c):
                     diff = self.diffs_p[i]
                     if diff > 0:
-                        pos.append(diff / 40)   # make sense
+                        pos.append(diff / 40)   # 40make sense
                     else:
                         pos.append(diff / 40)
                 # load mode
                 for i in range(self.c * self.r):
                     diff = self.diffs[i]
                     if diff > 0:
-                        pos.append(diff / 402528)   # make sense
+                        pos.append(diff / 402528)   # 402528 make sense
                     else:
                         pos.append(diff / 402528)
 
@@ -218,6 +218,7 @@ class FetchData:
     def fetch_ml_data(self, name):
         #name = input('type object name to log data above')
         #print(name)
+
         data_list = []
         # for obj in objs.names:
         print('target data: ' + name)
@@ -230,8 +231,15 @@ class FetchData:
         # peak = self.peak  # list[self.r * self.c]
         data1, base1 = [], []
         for j in range(len(self.ml_data)):
-            data1.append(self.ml_data[j])
-            base1.append(self.ml_base[j])
+            if self.ml_data[j] > 0:
+                data1.append(self.ml_data[j])   # load mode
+            else:
+                data1.append(0)
+
+            if self.ml_base[j] > 0:
+                base1.append(self.ml_base[j])   # transmission mode
+            else:
+                base1.append(0)
 
         line = str(name) + ','
         for d in data1:
@@ -260,7 +268,9 @@ class FetchData:
 
 
     def fetch_arduino_data(self):
+        start_time = time.time()
         result = self.arduino_port.readline().decode()
+        #print("record took" + str(time.time() - start_time) + "s")
         result_arr = result.split(", ")
         result_arr_load = result_arr[0:64]
         result_arr_tran = result_arr[64:128]
@@ -278,6 +288,7 @@ class FetchData:
         # print("                 fetch_arduino_data. update data and base for load and trans")
 
 
+
     def fetch_realtime_metrix(self):
         """From self.c*self.r*10 to self.c*self.r,
             so we get real time position metrix and energy metrix(self.c * self.r).
@@ -291,9 +302,16 @@ class FetchData:
         processed_base_p = np.array([self.processData(self.base_p[i]) for i in range(self.totalChannel)])
         self.ml_data = self.energy_metrix = processed_base - processed_data    # 16*16 np array. energy metrix [real time position] = energy
         self.ml_data = self.ml_data.tolist()
+        for i in self.ml_data:
+            if i < 0:
+                i = 0
+        # print("self.ml_data:{}".format(self.ml_data))
         self.ml_base = self.pos_metrix = processed_data_p - processed_base_p   # 16*16 np array. pos_metrix [real time position] = energy
                                                                 # object down: pos_metrix > 0
         self.ml_base = self.ml_base.tolist()
+        for i in self.ml_base:
+            if i < 0:
+                i = 0
         # print("                 fetch_realtime_metrix  data - base; data_p - base_p")
 
     def processData(self, data):

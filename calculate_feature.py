@@ -3,27 +3,14 @@
 
 import feature_extraction8
 import os
-import numpy as np
-import time
-import matplotlib.pyplot as plt
-from sklearn.model_selection import train_test_split
-from sklearn.model_selection import cross_val_score, ShuffleSplit
-from sklearn.tree import DecisionTreeRegressor
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import cross_val_predict
-from sklearn import metrics
-from sklearn import svm
-from sklearn import preprocessing
-from sklearn.metrics import confusion_matrix
-import random
 
-TYPE_NUM = 3    # TODO: changed
+
+TYPE_NUM = 4    # TODO: changed
 if __name__ == '__main__':
     print('calculate the features and store.')
 
     objectNums = TYPE_NUM
-    trainDataNums = 10  # (line)number of samples for each object, origin: 30；# TODO: changed
+    trainDataNums = 20  # (line)number of samples for each object, origin: 30；# TODO: changed
     coilNums = 64   # self.r * self.c
     train_file_num = TYPE_NUM
     cwd = os.getcwd()
@@ -61,7 +48,9 @@ if __name__ == '__main__':
             trans_diff = iterms[coilNums+1:2*coilNums+1]
 
             # extract the features: 23 types of~
-            feature = feature_extraction8.feature_calculation(load_diff, trans_diff, i, j)   # i-which file; j-which line
+            print("In file i={}, line j={}".format(i, j))
+            # feature = feature_extraction8.feature_calculation(load_diff, trans_diff, i, j)  # i-which file; j-which line
+            feature = feature_extraction8.feature_calculation(load_diff, trans_diff, i, j)  # i-which file; j-which line
             # print("feature: {}".format(feature))
 
             train_list.append(feature)  # one feature for each line
