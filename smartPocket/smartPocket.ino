@@ -6,8 +6,8 @@
 //#include <ADC_util.h>
 #define READ_PIN A0
 #define MODE_SWITCH_PIN 22
-#define ROW_NUM 8
-#define COLUMN_NUM 8
+#define ROW_NUM 4
+#define COLUMN_NUM 4
 #define MUXNUM 8
 #define REPEAT_COUNT 120
 //int mux_control_pins[MUXNUM][3] = {{2, 1, 0}, {7, 6, 5}, {10, 9, 8}, {16, 17,  20}, {24, 25, 26}, {27, 28, 29},{30, 31, 32},{21, 12, 33}};
