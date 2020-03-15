@@ -5,13 +5,13 @@ import feature_extraction8
 import os
 
 
-TYPE_NUM = 4    # TODO: changed
+TYPE_NUM = 20   # TODO: changed
 if __name__ == '__main__':
     print('calculate the features and store.')
 
     objectNums = TYPE_NUM
-    trainDataNums = 20  # (line)number of samples for each object, origin: 30；# TODO: changed
-    coilNums = 64   # self.r * self.c
+    trainDataNums = 50  # (line)number of samples for each object, origin: 30；# TODO: changed
+    coilNums = 144   # self.r * self.c
     train_file_num = TYPE_NUM
     cwd = os.getcwd()
 
@@ -19,18 +19,18 @@ if __name__ == '__main__':
     label_list = []  # save every samples' label here
     train_type = []
 
-    # for i in range(1,58):  # only use some kind of the objects to train and test.
-    #     if i in(1,7,13,38,52,10,26,27,28,57,39,56,48,53,17,18,19,20,23):
-    #         train_type.append(i)
     for i in range(0, train_file_num):
         train_type.append(i)    # train_type: [0,1,2, ... ]
-
     count = 0
-
     print("length of train type: "+str(len(train_type)))
+    obj = ["glass", "bowl", "lipstickTF", "avocado", "airpods", "book", "awardCARD", "discover_card", "dry_flower", "wet_flower", "green",  "grapefruit", "toshiba", "bowl+soup", "kiwifruit", "handsoap", "glass+water", "salt", "candle", "cheese1"]
+    # obj = ["bowl", "glass+none", "glass+water", "eyeshadow", "toshiba", "clay", "lipstick", "airpods", "shampoo", "dry_flower", "wet_flower", "grapefruit", "avocado", "orange"]
+    # obj = ["glass+beer", "glass+none", "glass+water", "eyeshadow", "toshiba", "clay", "lipstick", "airpods", "orange",
+    #        "dry_flower", "wet_flower", "avocado", "bowl+soap", "bowl"]
+    # obj = ["debit_card", "key", "green", "candle", "shampoo", "book", "bookmarker", "credit_card", "orange", "dry_flower", "wet_flower", "avocado", "bowl+soup", "bowl", "airpods", "glass+none", "glass+water", "eyeshadow", "clay", "lipstick"]
+    # obj = ["debit card", "glass+water", "ceramic mean person", "magnet bookmark", "shampoo", "book", "glass", "credit card", "orange", "lipstick", "flower with enough water", "avocado", "bowl+soup", "bowl", "airpods", "clay", "eyeshadow", "flower lack of water", "candle", "mobile hard disk device"]
     for i in train_type:    # scan all files
         count += 1
-
         # read the dataset of one object.
         filename = 'coil\\data\\c'+str(i)+'.csv'
         f = open(filename, 'r')
@@ -39,27 +39,30 @@ if __name__ == '__main__':
             # base = []
             load_diff = []  # data
             trans_diff = []  # base
-
+            peak = []
             line = f.readline()
+            print("line: {}".format(line))
             iterms = line.strip('\n').split(',')
             # print("iterms[0]: {}, iterms[1]: {}".format(iterms[0], iterms[1]))
 
             load_diff = iterms[1:coilNums+1]
+            load_diff = list(map(float, load_diff))
             trans_diff = iterms[coilNums+1:2*coilNums+1]
+            trans_diff = list(map(float, trans_diff))
+            trans_diff = [c / 50 for c in trans_diff]
 
             # extract the features: 23 types of~
             print("In file i={}, line j={}".format(i, j))
-            # feature = feature_extraction8.feature_calculation(load_diff, trans_diff, i, j)  # i-which file; j-which line
-            feature = feature_extraction8.feature_calculation(load_diff, trans_diff, i, j)  # i-which file; j-which line
-            # print("feature: {}".format(feature))
-
+            # feature = feature_extraction8.feature_calculation(load_diff, trans_diff)  # i-which file; j-which line
+            feature = feature_extraction8.feature_calculation(load_diff, trans_diff)  # i-which file; j-which line
             train_list.append(feature)  # one feature for each line
-            label_list.append(i)
+            print("i={}, obj[i]={}".format(i, obj[i]))
+            label_list.append(obj[i])
         print("i've added the " + str(count) + "th object")
 
         f.close()
 
-    # save the features for each sample and save them label in lavel.csv with same order.
+    # save the features for each sample and save them label in level.csv with same order.
     cwd = os.getcwd()  # current working dictionary
     feature_file = cwd + '\\coil\\data\\' + 'features.csv'
     f_feature = open(feature_file, 'w')
@@ -70,6 +73,8 @@ if __name__ == '__main__':
         current_line = current_line[:-1]
         current_line += '\n'
         f_feature.write(current_line)
+        # print("len of current_line: {}".format(len(current_line.split(','))))
+        # print("current_line: {}".format(current_line))
     f_feature.close()
 
     label_file = cwd + '\\coil\\data\\' + 'label.csv'

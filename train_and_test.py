@@ -27,7 +27,7 @@ from warnings import simplefilter
 simplefilter(action='ignore', category=FutureWarning)
 # 各种分类函数
 
-TYPE_NUM = 4    # todo: changed me to count(object)
+TYPE_NUM = 20    # todo: changed me to count(object)
 
 # SVM Classifier
 
@@ -69,7 +69,7 @@ def nearest_neighbors():
 # Random Forest Classifier
 def random_forest_classifier():
     from sklearn.ensemble import RandomForestClassifier
-    model = RandomForestClassifier(n_estimators=100, max_features=9)
+    model = RandomForestClassifier(n_estimators=100, max_features="auto")
     return model
 
 
@@ -112,6 +112,7 @@ def print_confusion_matrix(y_true, y_pred):
 
 
 def plot_confusion_matrix(y_true, y_pred, labels, saveFileName, showFlag):
+    # print("labels: {}".format(labels))
     # 用于将预测结果表示出来。
     cmap = plt.cm.binary
     cm = confusion_matrix(y_true, y_pred)
@@ -161,8 +162,8 @@ if __name__ == '__main__':
     print('begin myclassifier')
 
     objectNums = TYPE_NUM
-    trainDataNums = 10
-    coilNums = 64
+    trainDataNums = 50
+    coilNums = 144
 
     # Make train_list(float list) from file:features.csv
     train_list = []
@@ -183,20 +184,16 @@ if __name__ == '__main__':
     line = f_label.readline()
     iterm_label = line.strip('\n').split(',')
     for k in range(len(iterm_label)):
-        iterm_label[k] = int(iterm_label[k])
+        # iterm_label[k] = int(iterm_label[k])
         label_list.append(iterm_label[k])
 
-    # 打乱数据
-    #(data, labels) = random_shuffle_data(data, labels, 1)
     # 将数据改成ndarray格式
     x = np.array(train_list, dtype=np.float64)
     y = np.array(label_list)
     ## 数据预处理：归一化处理
     minMaxScale = preprocessing.MinMaxScaler()
     x = minMaxScale.fit_transform(x)
-    # print(minMaxScale.fit_transform(x))
-    # 获得测试集之后，也要进行归一化处理。
-    # x_test=minMaxScale.transform(x_test)
+    joblib.dump(minMaxScale, "scalar.save")
     test_classifiers = ['SVM', 'NB', 'NN', 'LR', 'RF', 'DT']  # 'SVM','NB','KNN','NN', 'LR', 'RF', 'DT'
     classifiers = {
         'SVM': svm_classifier,
@@ -218,6 +215,7 @@ if __name__ == '__main__':
 
     # train and store a Random Forest classifier.
     RF = RandomForestClassifier(n_estimators=100, max_features="auto")
+    from sklearn import tree
     x = np.nan_to_num(x)
     RF.fit(x, y)
     print(os.getcwd())

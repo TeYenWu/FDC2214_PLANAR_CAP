@@ -31,6 +31,7 @@ import random
 # print(rcsetup.all_backend s)
 INTERNAL_MUX_MODE = 0
 EXTERNAL_MUX_MODE = 1
+# WINDOW_SIZE = 10
 WINDOW_SIZE = 10
 MSP_CHANNEL = 4
 CONDUCTIVE_THRESHOLD = 600000
@@ -46,7 +47,7 @@ CHANELL = 4
 SUPPORTED_ACTION_NUM = 100
 ACTION_ENERGY_THRESHOLD = 10000
 OBJECT_ENERGY_THRESHOLD = 1000
-MAX_DRAW_POINT = 256    # self.c * self.r
+MAX_DRAW_POINT = 144    # self.c * self.r
 AREA_PERCENT = 0.7
 CANVAS_WIDTH = 800
 CANVAS_HEIGHT = 800
@@ -76,8 +77,8 @@ class FetchData:
         self.mysocket.bind(('localhost', 5000))
         self.mysocket.listen(1)
         self.conn = None
-        self.r = 8
-        self.c = 8
+        self.r = 12
+        self.c = 12
         self.recalibration = False
         self.calibration = True
         self.totalChannel = self.r * self.c
@@ -87,8 +88,9 @@ class FetchData:
         self.base_p = np.zeros((self.totalChannel, WINDOW_SIZE))
 
         #self.object_set = ["greenHead", "orange", "apple", "airpodsBOX", "airpods", "halfwater", "fullwater", "tinyTomato", "tinyGrape"]  # "blackTweezers","greenHead", "orange", "apple","airpods", "halfwater", "fullwater"
-        self.object_set = ["orange", "apple", "tinytoy", "airpods"]
-        self.trainNumber = 20
+        #self.object_set = ["ceramic_bowl", "glass", "coin", "avocado", "grapefruit", "cola_bottle"]
+        self.object_set = ["dry_flower"]  # candle, airpods, book"salt", "raw_avocado", "kiwifruit"
+        self.trainNumber = 50
         self.trainCount = 0
 
         # self.cur = np.zeros((self.layer, self.totalChannel, WINDOW_SIZE))
@@ -118,8 +120,6 @@ class FetchData:
 
         # time.sleep(1)
         self.reset()
-
-
 
         is_setup = False
         while not is_setup:
@@ -165,6 +165,21 @@ class FetchData:
     def calculateEnergy(self, values):
         return -(np.mean(values))
 
+    def read_peak(self):
+        """To get list: self.peak[]
+        """
+        cwd = os.getcwd()  # current working dictionary
+        filename = cwd + '\\coil\\' + 'peak' + '.csv'
+        f = open(filename, 'r')
+        line = f.readline()
+        items = line.strip('\n').split(',')
+        for i in items:
+            # print(i)
+            self.peak.append(i)
+        f.close()
+        self.peak = self.peak[:144]  # remove empty space
+        # print("list peak: {}".format(self.peak))
+        # print("len of list peak: {}".format(len(self.peak)))
 
     def sender(self):
         """Process values and then send them all to processing-program.
@@ -173,20 +188,24 @@ class FetchData:
         while 1:
             if self.fetch_ch_data():
                 pos = []
+
                 # transmission mode
+                self.read_peak()
                 for i in range(self.r * self.c):
                     diff = self.diffs_p[i]
                     if diff > 0:
-                        pos.append(diff / 40)   # 40make sense
+                        pos.append(diff / 50)   # 40make sense
                     else:
-                        pos.append(diff / 40)
+                        pos.append(diff / 50)
+
                 # load mode
                 for i in range(self.c * self.r):
-                    diff = self.diffs[i]
+                    diff = float(self.diffs[i]) / float(self.peak[i])
+                    # print("diffs[{}]:{}, peak[{}]:{}, division={}".format(i, self.diffs[i], i, self.peak[i], diff))
                     if diff > 0:
-                        pos.append(diff / 402528)   # 402528 make sense
+                        pos.append(diff)   # 402528 make sense
                     else:
-                        pos.append(diff / 402528)
+                        pos.append(diff)
 
                 if self.conn:
                     try:
@@ -201,10 +220,8 @@ class FetchData:
         """
         self.fetch_arduino_data()   # realtime self.data
         if self.start_object_recog:  # R-pressed, start to proceess the thread
-            #print("                 start_object_recog is True")
             self.fetch_realtime_metrix()
             self.calDiff()  # produce self.diffs[totalChannel], print data,base values out
-            self.get_peak()
             self.calPosDiff()   # produce self.diffs_p[totalChannel]
         else:
             print(" :) Please press Reset on keyboard")
@@ -222,17 +239,12 @@ class FetchData:
         data_list = []
         # for obj in objs.names:
         print('target data: ' + name)
-        # trial = 5  # 5 log for an object
-        # for i in range(trial):
-        # raw_input('press ENTER to begin trial {} >>'.format(i))
-        # input('press ENTER to begin trial {} >>'.format(i))  # Read directly from console, returns string.
-        #input('press ENTER to begin trial >>')  # Read directly from console, returns string.
-        # data, base = self.fetch_ch_data()
-        # peak = self.peak  # list[self.r * self.c]
         data1, base1 = [], []
+        self.read_peak()
         for j in range(len(self.ml_data)):
             if self.ml_data[j] > 0:
-                data1.append(self.ml_data[j])   # load mode
+                data1.append(float(self.ml_data[j])/float(self.peak[j]))   # load mode
+                # print("diffs[{}]:{}, peak[{}]:{}, division={}".format(i, self.diffs[i], i, self.peak[i], diff))
             else:
                 data1.append(0)
 
@@ -270,10 +282,10 @@ class FetchData:
     def fetch_arduino_data(self):
         start_time = time.time()
         result = self.arduino_port.readline().decode()
-        #print("record took" + str(time.time() - start_time) + "s")
+        # print("record took" + str(time.time() - start_time) + "s")
         result_arr = result.split(", ")
-        result_arr_load = result_arr[0:64]
-        result_arr_tran = result_arr[64:128]
+        result_arr_load = result_arr[0:144]
+        result_arr_tran = result_arr[144:288]
 
         for i in range(self.r):
             for j in range(self.c):
@@ -285,9 +297,6 @@ class FetchData:
                 if self.calibration:
                     self.base[i * self.c + j] = copy.deepcopy(self.data[i * self.c + j])
                     self.base_p[i * self.c + j] = copy.deepcopy(self.data_p[i * self.c + j])
-        # print("                 fetch_arduino_data. update data and base for load and trans")
-
-
 
     def fetch_realtime_metrix(self):
         """From self.c*self.r*10 to self.c*self.r,
@@ -295,9 +304,7 @@ class FetchData:
         :return:
         """
         processed_data = np.array([self.processData(self.data[i]) for i in range(self.totalChannel)])
-        # self.ml_data = processed_data.tolist()
         processed_base = np.array([self.processData(self.base[i]) for i in range(self.totalChannel)])
-        # self.ml_base = processed_base.tolist()
         processed_data_p = np.array([self.processData(self.data_p[i]) for i in range(self.totalChannel)])
         processed_base_p = np.array([self.processData(self.base_p[i]) for i in range(self.totalChannel)])
         self.ml_data = self.energy_metrix = processed_base - processed_data    # 16*16 np array. energy metrix [real time position] = energy
@@ -305,7 +312,6 @@ class FetchData:
         for i in self.ml_data:
             if i < 0:
                 i = 0
-        # print("self.ml_data:{}".format(self.ml_data))
         self.ml_base = self.pos_metrix = processed_data_p - processed_base_p   # 16*16 np array. pos_metrix [real time position] = energy
                                                                 # object down: pos_metrix > 0
         self.ml_base = self.ml_base.tolist()
@@ -370,21 +376,6 @@ class FetchData:
                 self.diffs[i] = -diff  # TODO: recg >0? <0?
             else:
                 self.diffs[i] = 0
-
-        # for i in range(self.r):
-        #     for j in range(self.c):
-        #         print("{}-{}={}".format(self.processData(self.base[i*self.r + j]), self.processData(self.data[i* self.r + j]), self.diffs[i*self.r + j]), end=" ")
-        #     print("\n")
-        # print("diff")
-        # print(self.diffs)
-
-    def get_peak(self):
-        for i in range(self.r * self.c):
-            if self.diffs[i] > self.peak[i]:
-                self.peak[i] = self.diffs[i]
-        # print("Peak: {}".format(self.peak))
-
-
 
     def calPosDiff(self):
         """Calculate diffs_p[]
@@ -506,7 +497,7 @@ class FetchData:
         self.capDecreasePeak = np.ones((self.totalChannel)) * CAP_DECREASE_PEAK
         self.diffs = np.zeros((self.totalChannel))
         # for ML
-        self.peak = [0] * self.r * self.c
+        self.peak = []
         self.ml_data = []
         self.ml_base = []
         self.mapping = []
