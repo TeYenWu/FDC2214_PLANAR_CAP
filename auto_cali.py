@@ -139,7 +139,7 @@ class FetchData:
                         self.start_object_recog = True
                     elif d.strip() == "log":    # L-key on keyboard is pressed
                         # print("             log")
-                        self.fetch_ml_data(self.object_set[self.trainCount//self.trainNumber])
+                        self.predict()
                     elif d.strip() == "drawback":   # drawback
                         self.drawback()
 
@@ -219,12 +219,12 @@ class FetchData:
             self.recalibration = False
         return True
 
-    def fetch_ml_data(self, name):
+    def predict(self):
         #name = input('type object name to log data above')
         #print(name)
         data_list = []
         # for obj in objs.names:
-        print('target data: ' + name)
+        # print('target data: ' + name)
         data1, base1 = [], []
         self.read_peak()
 
@@ -240,12 +240,12 @@ class FetchData:
             else:
                 base1.append(0)
 
-        line = str(name) + ','
+        line = "str(name)" + ','
         for d in data1:
             line += str(d) + ','
         for b in base1:
             line += str(b) + ','
-        line_feature = line + str(name)
+        line_feature = line + 'str(name)'
         iterms = line_feature.strip('\n').split(',')
         coilNums = 144  # self.r * self.c
         load_diff = iterms[1:coilNums + 1]
@@ -276,30 +276,6 @@ class FetchData:
         prediction = prediction[2:-2]
         self.prediction = prediction
         print("prediction: {}".format(prediction))
-
-        cwd = os.getcwd()  # current working dictionary
-        ffilename = cwd + '\\userstudy\\' + 'c' + str(self.trainCount // self.trainNumber) + '.csv'
-        # print("Filename: {}".format(filename))
-        ff = open(ffilename, mode='a+', encoding='utf-8')
-        ff.write(str(prediction) + '\n')
-        ff.close()
-        # print('writen {} to file {} '.format(prediction, ffilename))
-
-        # LOG USER DATA MEANWHILE
-        line += str(name) + '\n'
-        data_list.append(line)
-
-        cwd = os.getcwd()  # current working dictionary
-        filename = cwd + '\\userstudy\\' + 'user' + str(self.trainCount//self.trainNumber) + '.csv'
-        f = open(filename, mode='a+', encoding='utf-8')
-        for line in data_list:
-            f.write(line)
-        f.close()
-        # print('writen to file ' + filename)
-
-        self.trainCount += 1
-        if self.trainCount % self.trainNumber == 0:
-            print("\n start data collection of the next object \n")
 
 
     def fetch_arduino_data(self):
@@ -377,6 +353,8 @@ class FetchData:
                     self.diffs_p[i] = diff_t
                 else:
                     self.diffs_p[i] = 0
+
+            self.predict()
 
 
 
