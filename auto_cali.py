@@ -106,6 +106,7 @@ class FetchData:
 
         # time.sleep(1)
         self.reset()
+        self.prediction = "none"
 
         is_setup = False
         while not is_setup:
@@ -192,6 +193,7 @@ class FetchData:
                     else:
                         pos.append(diff)
 
+                pos.append(self.prediction)
                 if self.conn:
                     try:
                         self.conn.send((' '.join(str(e) for e in pos) + '\n').encode())
@@ -270,6 +272,9 @@ class FetchData:
         x = np.nan_to_num(x)
         x = x.reshape(1, -1)
         prediction = clf.predict(x)
+        prediction = np.array2string(prediction)
+        prediction = prediction[2:-2]
+        self.prediction = prediction
         print("prediction: {}".format(prediction))
 
         cwd = os.getcwd()  # current working dictionary
@@ -342,16 +347,17 @@ class FetchData:
             if i < 0:
                 i = 0
 
-        print("BEFORE CALI: max of transmission is:{}".format(np.amax(self.ml_base)))
-        print("BEFORE CALI: max of load is:{}".format(np.amax(self.ml_data)))
+        # print("BEFORE CALI: max of transmission is:{}".format(np.amax(self.ml_base)))
+        # print("BEFORE CALI: max of load is:{}".format(np.amax(self.ml_data)))
         # print("\n")
 
         if np.amax(self.ml_base) <= 7 or np.amax(self.ml_data) < 10000:
             self.diffs = np.zeros((self.totalChannel))
             self.diffs_p = np.zeros((self.totalChannel))
-            print("*************auto cali***************")
+            # print("*************auto cali***************")
             self.ml_base = [0] * self.r * self.c
             self.ml_data = [0] * self.r * self.c
+            self.prediction = "none"
             # print("AFTER CALI: max of transmission is:{}".format(np.amax(self.ml_base)))
             # print("AFTER CALI: max of load is:{}".format(np.amax(self.ml_data)))
             print("\n")

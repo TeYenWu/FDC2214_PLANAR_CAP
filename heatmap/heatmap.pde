@@ -1,4 +1,3 @@
-
 import processing.serial.*;
 import processing.net.*;
 //import signal.library.*;
@@ -8,14 +7,14 @@ Client myClient;
 int dataIn; 
 
 Serial myPort;        // The serial port
-int r = 8;         // horizontal position of the graph
-int c = 8;
+int r = 12;         // horizontal position of the graph
+int c = 12;
 int layer = 2;
 
 float values[][] = new float[layer][r*c];
 float graphRatio = 0.5;
 int category = -1;
-int cellSize = 60;
+int cellSize = 100;
 int cutoff = 10;
 int low_cutoff = -1;
  
@@ -28,14 +27,16 @@ color c_w = color(255,255,255);
 color c_b = color(0,0,0);
 BlobDetection theBlobDetection;
 int interp_values[] = new int[3000000];
-int heatMapGap = 500;
+//int heatMapGap = 360;
+int heatMapGap = 40;
 float diffValues[] = new float[r*c];
+String prediction = "none";
 
 void setup () {
   // set the window size:
   //fullScreen();
   textSize(10);
-  size(1000,1000);
+  size(1450,1250);
   // init socket client
   myClient = new Client(this, "127.0.0.1", 5000);
   // set initial background:
@@ -43,7 +44,7 @@ void setup () {
   
   theBlobDetection = new BlobDetection(width, height);
   theBlobDetection.setPosDiscrimination(true);
-  theBlobDetection.setThreshold(0.3f);
+  theBlobDetection.setThreshold(0.2f);
 }
 
 void updateValues(){
@@ -54,7 +55,7 @@ void updateValues(){
  
       print("Data: ");
       for (int k = 0; k < layer; k++){
-          for (int i = 0; i < r * c; i++){
+          for (int i = 0; i < r * c ; i++){
           //if(i%r >=cutoff || i/r >=cutoff) continue;
           //if(i%r <=low_cutoff || i/r <=low_cutoff) continue;
           values[k][i] =  (Float.valueOf(data[i+k * r * c].trim()));
@@ -62,6 +63,7 @@ void updateValues(){
           // trans-data: values[0]
           // load-data: values[1]
           print(" ");
+      prediction = data[layer * r * c].trim();
         }
       }
     }
@@ -121,41 +123,23 @@ color getGrayGradientColor(float value, float maxValue){
 
 void fillHeatMap(){
   loadPixels();
-  for (int k = 0; k < layer; k++){
-    float interp_array[][] = bilinearInterpolation(values[k]);
-    float max_positive = 1;
-    float max_negative = -1;         
-    for(int y=0; y < cellSize*r; y++){
-      for(int x = 0; x < cellSize*c; x++){
-            color c =  color(0,0,0);
-            
-            if(interp_array[y][x]<0){
-             interp_values[y*width+x+k*heatMapGap] = int(-interp_array[y][x]*255);
-              c = getGrayGradientColor(interp_array[y][x], max_negative);
-            } else{ 
-              c = getGradientColor(interp_array[y][x], max_positive);            
-            }
-            pixels[y*width+x+k*heatMapGap] = c;  // set color 
-      }
+  
+  float interp_array[][] = bilinearInterpolation(values[0]);
+  float max_positive = 1;
+  float max_negative = -1;         
+  for(int y=0; y < cellSize*r; y++){
+    for(int x = 0; x < cellSize*c; x++){
+          color c =  color(0,0,0);
+          
+          if(interp_array[y][x]<0){
+           interp_values[y*width+x+0*heatMapGap] = int(-interp_array[y][x]*255);
+            c = getGrayGradientColor(interp_array[y][x], max_negative);
+          } else{ 
+            c = getGradientColor(interp_array[y][x], max_positive);            
+          }
+          pixels[y*width+x+3*heatMapGap] = c;  // set color 
     }
   }
-  
-  //float interp_array[][] = bilinearInterpolation(diffValues);
-  //for(int y=0; y < cellSize*r; y++){
-  //  for(int x = 0; x < cellSize*c; x++){
-  //        color c =  color(0,0,0);
-          
-  //        if(interp_array[y][x]<0){
-  //         interp_values[y*width+x+2*heatMapGap] = int(-interp_array[y][x]*255);
-  //          c = getGrayGradientColor(interp_array[y][x], -1);
-  //        } else{
-           
-  //          c = getGradientColor(interp_array[y][x], 1);
-  //        }
-  //        pixels[y*width+x+2*heatMapGap] = c;
-  //  }
-  //}
-
   updatePixels();
 }
 
@@ -165,6 +149,9 @@ void keyPressed() {
   }
   else if (key == 'l' || key == 'L'){
     myClient.write("log\n");
+  }
+  else if (key == 'z' || key == 'Z'){
+    myClient.write("drawback\n");
   }
 }
 
@@ -235,23 +222,11 @@ void draw () {
   //bilinear_interpolation();
   stroke(255);
   fillHeatMap();
-  
-  for (int k = 0; k < layer; k++){
-    for (int i = 0; i < r * c; i++){
-      print();
-      fill(0, 102, 153);
-      textSize(16);
-      
-      text(nf(values[k][i], 1, 3), (c-i%c-1)*cellSize + cellSize / 2 + k*heatMapGap, (r- i/c-1)*cellSize + cellSize / 2); 
-       
-    }
-      
-  }
-  
+  textSize(150);
+  textAlign(CENTER);
+  text(prediction, width / 2, cellSize*2);
   stroke(0, 255, 0);
   //ellipse(x_touch/sum/2.5 * cellSize* c,y_touch/sum/2.7 * cellSize* r,30,30);
   //println(x_touch/sum, y_touch/sum);
   drawBlobsAndEdges(false, true);
-   
-   
 }
