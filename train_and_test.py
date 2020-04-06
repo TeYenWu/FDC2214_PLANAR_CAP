@@ -11,7 +11,6 @@ from sklearn.model_selection import cross_val_score, ShuffleSplit
 #from sklearn.cross_validation import cross_val_score, ShuffleSplit
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.ensemble import RandomForestRegressor
-# 这里是有问题的，我探究的是分类问题。
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import cross_val_predict
 from sklearn import metrics
@@ -21,13 +20,12 @@ from sklearn.metrics import confusion_matrix
 import random
 from sklearn.externals import joblib
 import os
-# import warnings filter
 from warnings import simplefilter
 # ignore all future warnings
 simplefilter(action='ignore', category=FutureWarning)
 # 各种分类函数
 
-TYPE_NUM = 20    # todo: changed me to count(object)
+TYPE_NUM = 7   # todo: changed me to count(object)
 
 # SVM Classifier
 
@@ -162,12 +160,13 @@ if __name__ == '__main__':
     print('begin myclassifier')
 
     objectNums = TYPE_NUM
-    trainDataNums = 50
+    trainDataNums = 20
     coilNums = 144
 
     # Make train_list(float list) from file:features.csv
     train_list = []
     label_list = []
+
     cwd = os.getcwd()  # current working dictionary
     feature_file = cwd + '\\coil\\data\\' + 'features.csv'
     f_feature = open(feature_file, 'r')
@@ -183,6 +182,7 @@ if __name__ == '__main__':
     f_label = open(label_file, 'r')
     line = f_label.readline()
     iterm_label = line.strip('\n').split(',')
+    # iterm_label = line.split(',')
     for k in range(len(iterm_label)):
         # iterm_label[k] = int(iterm_label[k])
         label_list.append(iterm_label[k])
@@ -194,7 +194,8 @@ if __name__ == '__main__':
     minMaxScale = preprocessing.MinMaxScaler()
     x = minMaxScale.fit_transform(x)
     joblib.dump(minMaxScale, "scalar.save")
-    test_classifiers = ['SVM', 'NB', 'NN', 'LR', 'RF', 'DT']  # 'SVM','NB','KNN','NN', 'LR', 'RF', 'DT'
+    # test_classifiers = ['SVM', 'NB', 'NN', 'LR', 'RF', 'DT']  # 'SVM','NB','KNN','NN', 'LR', 'RF', 'DT'
+    test_classifiers = ['RF']
     classifiers = {
         'SVM': svm_classifier,
         'NB': naive_bayes_classifier,
@@ -211,7 +212,7 @@ if __name__ == '__main__':
     for i in range(1, classNum + 1, 1):
         misNumPerClass[i] = 0
     # KFoldNum存储交叉验证的次数。
-    KFoldNum = 10
+    KFoldNum = 2
 
     # train and store a Random Forest classifier.
     RF = RandomForestClassifier(n_estimators=100, max_features="auto")
@@ -223,12 +224,23 @@ if __name__ == '__main__':
 
     for classifier in test_classifiers:  # calculate the confusion matrix and show the accuracy for different classifier.
         print('******************* %s ********************' % classifier)
+        individual_accuracy = [0] * TYPE_NUM
         start_time = time.time()
         model = classifiers[classifier]()
         predict = cross_val_predict(model, x, y, cv=KFoldNum)
 
         print('cross_val_predict took %fs!' % (time.time() - start_time))
         accuracy = metrics.accuracy_score(y, predict)
+        # print("predict:\n{}".format(predict))
+        for i in range(len(predict)):
+            if i%20 == 0:
+                print("\n")
+            print(predict[i], end=',')
+            if predict[i] == y[i]:
+                # print("i//20={}".format(i//20))
+                individual_accuracy[i//20] += 1
+
+        # print("\ny:\n{}".format(y))
         # print_confusion_matrix(y,predict)
 
         # save a confusion matrix as .png
@@ -238,4 +250,10 @@ if __name__ == '__main__':
         showFig = 0
         plot_confusion_matrix(y, predict, list(set(label_list)), figFileName, showFig)
         # print training accuracy.
-        print('accuracy: %.2f%%' % (100 * accuracy))
+        print('\naccuracy: %.2f%%' % (100 * accuracy))
+
+        print("individual_accuracy[]:{}".format(individual_accuracy))
+        individual_accuracy = [c / 20 for c in individual_accuracy]
+        print("individual_accuracy[]:{}".format(individual_accuracy))
+        ac_std = np.std(individual_accuracy, ddof=1)
+        print("accuracy SD={}".format(ac_std))
