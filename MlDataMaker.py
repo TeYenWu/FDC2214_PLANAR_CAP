@@ -86,11 +86,10 @@ class FetchData:
         self.base = np.zeros((self.totalChannel, WINDOW_SIZE))
         self.data_p = np.zeros((self.totalChannel, WINDOW_SIZE))
         self.base_p = np.zeros((self.totalChannel, WINDOW_SIZE))
-
-        #self.object_set = ["greenHead", "orange", "apple", "airpodsBOX", "airpods", "halfwater", "fullwater", "tinyTomato", "tinyGrape"]  # "blackTweezers","greenHead", "orange", "apple","airpods", "halfwater", "fullwater"
-        #self.object_set = ["ceramic_bowl", "glass", "coin", "avocado", "grapefruit", "cola_bottle"]
-        self.object_set = ["dry_flower"]  # candle, airpods, book"salt", "raw_avocado", "kiwifruit"
-        self.trainNumber = 50
+        self.object_set = ["dry-soil", "wet-soil"]
+        # self.object_set = ["glass-with-water", "candle", "salt", " sanitizer", "discover-card", "JCPenney-rewards-card", "slice-of-kraft-cheese", "hard-drive", "book"]
+        # self.object_set = ["grapefruit", "kiwi", "avocado", "glass", "glass-with-water", "bowl", "dry-soil", "wet-soil", "slice-of-cheese", "JCPenney-rewards-card", "discover-card", "book", "hard-drive", "candle"]  # candle, airpods, book"salt", "raw_avocado", "kiwifruit"
+        self.trainNumber = 10
         self.trainCount = 0
 
         # self.cur = np.zeros((self.layer, self.totalChannel, WINDOW_SIZE))
@@ -193,19 +192,27 @@ class FetchData:
                 self.read_peak()
                 for i in range(self.r * self.c):
                     diff = self.diffs_p[i]
+                    # print("diffs_p[{}]:{}, peak[{}]:{}, division={}".format(i, self.diffs_p[i], i, self.peak[i], diff))
                     if diff > 0:
-                        pos.append(diff / 50)   # 40make sense
+                        pos.append(diff / 100)   # 40make sense
                     else:
-                        pos.append(diff / 50)
+                        pos.append(diff / 100)
 
                 # load mode
                 for i in range(self.c * self.r):
-                    diff = float(self.diffs[i]) / float(self.peak[i])
+                    # diff = (float(self.diffs[i]) - float(self.peak[i])*0.6) / float(self.peak[i]) if float(self.peak[i]) != 0 else 0
+                    # diff = (float(self.diffs[i]) - 0.6*float(self.peak[i])) / float(self.peak[i]) if float(self.peak[i]) != 0 else 0 # V2
+                    diff = float(self.diffs[i]) / float(self.peak[i]) if float(self.peak[i]) != 0 else 0  # V3
+                    # diff = float(self.diffs[i]) / 100000
+                    # diff = 3*diff - 2
+                    # print("diff:{}".format(diff))
                     # print("diffs[{}]:{}, peak[{}]:{}, division={}".format(i, self.diffs[i], i, self.peak[i], diff))
                     if diff > 0:
                         pos.append(diff)   # 402528 make sense
                     else:
                         pos.append(diff)
+
+                # print("pos:{}".format(pos))
 
                 if self.conn:
                     try:
@@ -363,10 +370,15 @@ class FetchData:
     def calDiff(self):
         """Calculate diffs[][]
         """
+        temp_base = self.processData(self.base[72])
+        temp_data = self.processData(self.data[72])
+        diff = temp_base - temp_data
+        # print("diff:{}-{}={}".format(temp_base, temp_data, diff))
         for i in range(self.totalChannel):
             processed_data = self.processData(self.data[i])
             processed_base = self.processData(self.base[i])
             diff = processed_data - processed_base
+            # print("diff:{}-{}={}".format(processed_data,processed_base,diff))
             # if (diff > 0):
             #     # self.base[i] = [processed_base]*WINDOW_SIZE
             #     diff = 0
@@ -375,7 +387,8 @@ class FetchData:
             if diff < 0:
                 self.diffs[i] = -diff  # TODO: recg >0? <0?
             else:
-                self.diffs[i] = 0
+                # self.diffs[i] = 0
+                self.diffs[i] = diff
 
     def calPosDiff(self):
         """Calculate diffs_p[]
@@ -389,22 +402,6 @@ class FetchData:
                 self.diffs_p[i] = diff
             else:
                 self.diffs_p[i] = 0
-        '''
-        print("Check value of transmission mode data&base.")
-        for i in range(self.r):
-            for j in range(self.c):
-                print(str(self.processData(self.data_p[i*self.r + j])) + "-" + str(self.processData(self.base_p[i*self.r + j])), end="  ")
-            print("\n")
-        '''
-
-    # def calPosition(self):
-    #     """Print diffs
-    #
-    #     :return:
-    #     """
-    #     print("Diffs: ")
-    #     for i in range(self.totalChannel):
-    #         print(self.diffs[i])
 
     def returnCalDiff(self):
         for i in range(self.totalChannel):
